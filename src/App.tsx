@@ -1241,19 +1241,19 @@ export default function App() {
           </div>
 
           {/* ACTIVE SONG INFO & CONTROLLER BOX (The Bento Hub) */}
-          <div className="w-full glass-card glow-border p-5 rounded-2xl flex flex-col items-center shadow-2xl space-y-4">
+          <div className="w-full glass-card glow-border p-4.5 rounded-2xl flex flex-col items-center shadow-2xl space-y-1.5">
             
             {/* TEXT HEADLINE */}
             <div className="text-center w-full px-2">
-              <h2 className="text-md md:text-lg font-bold tracking-tight text-primary truncate max-w-xs mx-auto mb-1">
+              <h2 className="text-sm md:text-md font-extrabold tracking-tight text-primary truncate max-w-xs mx-auto mb-0.5">
                 {activeTrack ? activeTrack.title : 'DTMusic Player'}
               </h2>
-              <p className="text-[11px] md:text-xs text-secondary truncate max-w-xs mx-auto min-h-[16px]">
+              <p className="text-[10px] md:text-[11px] text-muted truncate max-w-xs mx-auto min-h-[14px]">
                 {activeTrack ? activeTrack.artist : 'Thả nhạc hoặc nhập đường dẫn để thưởng thức'}
               </p>
 
               {/* Badges list */}
-              <div className="flex items-center justify-center gap-2 mt-2.5">
+              <div className="flex items-center justify-center gap-2 mt-3">
                 <button
                   onClick={() => setShowEQ((prev) => !prev)}
                   className={`text-[9px] font-bold px-3 py-1 rounded-full transition-all cursor-pointer flex items-center gap-1 border border-border ${
@@ -1273,114 +1273,16 @@ export default function App() {
               </div>
             </div>
 
-            {/* PLAYER PROGRESS TIMELINER */}
-            <div className="w-full px-1">
-              <input
-                type="range"
-                min="0"
-                max={duration || 100}
-                value={currentTime}
-                onChange={(e) => seekTime(parseFloat(e.target.value))}
-                disabled={tracks.length === 0}
-                className="w-full h-[4.5px] bg-border-hover rounded-lg accent-accent cursor-pointer slider-custom"
-                style={{
-                  background: `linear-gradient(to right, var(--accent) ${
-                    duration ? (currentTime / duration) * 100 : 0
-                  }%, var(--bg-tertiary) ${duration ? (currentTime / duration) * 100 : 0}%)`,
-                }}
-              />
-              <div className="flex justify-between items-center text-[9px] text-muted font-bold font-mono mt-1 px-0.5">
-                <span>{formatTimeStr(currentTime)}</span>
-                <span>{formatTimeStr(duration)}</span>
-              </div>
-            </div>
-
-            {/* HANDY CONTROL TRIGGERS */}
-            <div className="flex items-center gap-5 justify-center w-full">
-              <button
-                onClick={() => setIsShuffle((prev) => !prev)}
-                className={`p-1.5 rounded-full hover:bg-hover transition-colors cursor-pointer ${
-                  isShuffle ? 'text-accent shadow-[0_0_10px_var(--accent-glow)]' : 'text-muted hover:text-primary'
-                }`}
-                title="Phát ngẫu nhiên"
-              >
-                <Shuffle className="w-3.5 h-3.5" />
-              </button>
-
-              <button
-                onClick={skipPrev}
-                className="p-2 rounded-full hover:bg-hover text-secondary hover:text-primary transition-colors cursor-pointer"
-                title="Bài trước"
-              >
-                <SkipBack className="w-4.5 h-4.5 fill-current" />
-              </button>
-
-              <button
-                onClick={togglePlay}
-                className="w-11 h-11 rounded-full bg-accent hover:scale-105 active:scale-95 text-white flex items-center justify-center cursor-pointer transition-all shadow-[0_4px_20px_rgba(167,139,250,0.35)] hover:shadow-[0_6px_25px_var(--accent-glow-strong)]"
-                title="Phát/Dừng (Phím cách)"
-                id="player-play-btn"
-              >
-                {isPlaying ? (
-                  <Pause className="w-4.5 h-4.5 fill-current" />
-                ) : (
-                  <Play className="w-4.5 h-4.5 fill-current ml-0.5" />
-                )}
-              </button>
-
-              <button
-                onClick={skipNext}
-                className="p-2 rounded-full hover:bg-hover text-secondary hover:text-primary transition-colors cursor-pointer"
-                title="Bài tiếp theo"
-              >
-                <SkipForward className="w-4.5 h-4.5 fill-current" />
-              </button>
-
-              <button
-                onClick={() => setRepeatMode((prev) => ((prev + 1) % 3) as 0 | 1 | 2)}
-                className={`p-1.5 rounded-full hover:bg-hover transition-colors cursor-pointer relative ${
-                  repeatMode > 0 ? 'text-accent' : 'text-muted hover:text-primary'
-                }`}
-                title={repeatMode === 1 ? 'Lặp lại toàn danh sách' : repeatMode === 2 ? 'Lặp lại 1 bài' : 'Không lặp'}
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                {repeatMode === 2 && (
-                  <span className="absolute top-0 right-0 bg-accent text-[7.5px] text-white font-extrabold w-3 h-3 rounded-full flex items-center justify-center">
-                    1
-                  </span>
-                )}
-              </button>
-            </div>
-
-            {/* DETAILED HORIZONTAL VOLUME SETTING */}
-            <div className="flex items-center gap-3 w-full max-w-[200px] justify-center pt-1">
-              <button onClick={toggleMute} className="text-secondary hover:text-primary transition-colors cursor-pointer shrink-0">
-                {isMuted ? <VolumeX className="w-3.5 h-3.5 text-rose-500" /> : <Volume2 className="w-3.5 h-3.5" />}
-              </button>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={volume}
-                onChange={(e) => setVolume(parseInt(e.target.value))}
-                className="flex-1 h-[3.5px] bg-border-hover rounded-lg accent-accent cursor-pointer slider-custom"
-                style={{
-                  background: `linear-gradient(to right, var(--accent) ${volume}%, var(--bg-tertiary) ${volume}%)`,
-                }}
-              />
-              <span className="text-[8.5px] font-bold font-mono text-muted w-6 text-right shrink-0">{volume}%</span>
-            </div>
-
           </div>
 
         </div>
       </main>
 
       {/* ══ FOOTER BAR CONTROLS (Slim Modern Layout) ══ */}
-      <footer id="player-bar" className="col-span-1 md:col-span-2 bg-secondary border-t border-border flex items-center justify-between px-6 py-2.5 z-20 select-none">
+      <footer id="player-bar" className="col-span-1 md:col-span-2 bg-secondary/95 backdrop-blur-md border-t border-border flex flex-col md:flex-row items-center justify-between px-4 md:px-6 py-2.5 z-20 select-none gap-2 md:gap-4 md:h-[72px]">
         
         {/* Foot Track Specs */}
-        <div className="flex items-center gap-3 max-w-[200px] md:max-w-xs w-full">
+        <div className="flex items-center gap-3 w-full md:w-auto md:max-w-xs shrink-0">
           <div className="w-[42px] h-[42px] rounded-lg bg-tertiary/60 overflow-hidden shrink-0 border border-border flex items-center justify-center p-0.5">
             {activeTrack?.art ? (
               <img src={activeTrack.art} alt={activeTrack.title} className="w-full h-full object-cover rounded" />
@@ -1388,25 +1290,40 @@ export default function App() {
               <Music4 className="w-4.5 h-4.5 text-muted/60 animate-pulse" />
             )}
           </div>
-          <div className="min-w-0">
-            <h4 className="text-xs font-semibold text-primary truncate">
+          <div className="min-w-0 flex-1 md:flex-initial">
+            <h4 className="text-xs font-semibold text-primary truncate max-w-[200px]">
               {activeTrack ? activeTrack.title : 'DTMusic Player'}
             </h4>
-            <p className="text-[10px] text-muted truncate">
+            <p className="text-[10px] text-muted truncate max-w-[200px]">
               {activeTrack ? activeTrack.artist : 'Chưa chọn bài hát'}
             </p>
           </div>
         </div>
 
-        {/* Foot bar timeline and controller on large devices */}
-        <div className="hidden md:flex flex-col items-center flex-1 max-w-xl mx-10 py-1">
-          <div className="flex items-center gap-4 mb-1 px-4 py-0.5 rounded-full bg-tertiary/20 border border-border/20">
-            <button onClick={skipPrev} className="text-muted hover:text-primary transition-colors cursor-pointer">
+        {/* Center timeline and controller on all devices with responsive touchpoints */}
+        <div className="flex flex-col items-center flex-1 w-full max-w-xl mx-0 md:mx-4 py-0.5 z-20">
+          <div className="flex items-center gap-4.5 md:gap-5 mb-1 px-4 py-0.5 rounded-full bg-tertiary/20 border border-border/10">
+            {/* Shuffle button */}
+            <button
+              onClick={() => setIsShuffle((prev) => !prev)}
+              className={`p-1 hover:text-accent transition-colors cursor-pointer ${
+                isShuffle ? 'text-accent drop-shadow-[0_0_4px_rgba(167,139,250,0.6)]' : 'text-muted'
+              }`}
+              title="Phát ngẫu nhiên"
+            >
+              <Shuffle className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Prev button */}
+            <button onClick={skipPrev} className="text-secondary hover:text-primary transition-colors cursor-pointer" title="Bài trước">
               <SkipBack className="w-3.5 h-3.5 fill-current" />
             </button>
+
+            {/* Main Play/Pause Button */}
             <button
               onClick={togglePlay}
-              className="w-7 h-7 rounded-full bg-accent hover:scale-105 active:scale-95 text-white flex items-center justify-center cursor-pointer transition-all shadow-md"
+              className="w-8 h-8 rounded-full bg-accent hover:scale-105 active:scale-95 text-white flex items-center justify-center cursor-pointer transition-all shadow-md shadow-accent/20"
+              title="Phát/Tạm dừng (Phím Cách)"
             >
               {isPlaying ? (
                 <Pause className="w-3.5 h-3.5 fill-current" />
@@ -1414,12 +1331,31 @@ export default function App() {
                 <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
               )}
             </button>
-            <button onClick={skipNext} className="text-muted hover:text-primary transition-colors cursor-pointer">
+
+            {/* Next button */}
+            <button onClick={skipNext} className="text-secondary hover:text-primary transition-colors cursor-pointer" title="Bài tiếp theo">
               <SkipForward className="w-3.5 h-3.5 fill-current" />
             </button>
+
+            {/* Repeat button */}
+            <button
+              onClick={() => setRepeatMode((prev) => ((prev + 1) % 3) as 0 | 1 | 2)}
+              className={`p-1 hover:text-accent transition-colors cursor-pointer relative ${
+                repeatMode > 0 ? 'text-accent' : 'text-muted'
+              }`}
+              title={repeatMode === 1 ? 'Lặp lại toàn bộ' : repeatMode === 2 ? 'Lặp lại 1 bài' : 'Không lặp'}
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              {repeatMode === 2 && (
+                <span className="absolute top-[-2px] right-[-2px] bg-accent text-[6.5px] text-white font-extrabold w-2.5 h-2.5 rounded-full flex items-center justify-center">
+                  1
+                </span>
+              )}
+            </button>
           </div>
-          <div className="w-full flex items-center gap-2.5">
-            <span className="text-[8.5px] font-bold text-muted font-mono">{formatTimeStr(currentTime)}</span>
+
+          <div className="w-full flex items-center gap-2">
+            <span className="text-[8.5px] font-bold text-muted font-mono w-[30px] text-right">{formatTimeStr(currentTime)}</span>
             <input
               type="range"
               min="0"
@@ -1434,15 +1370,35 @@ export default function App() {
                 }%, var(--bg-tertiary) ${duration ? (currentTime / duration) * 100 : 0}%)`,
               }}
             />
-            <span className="text-[8.5px] font-bold text-muted font-mono">{formatTimeStr(duration)}</span>
+            <span className="text-[8.5px] font-bold text-muted font-mono w-[30px]">{formatTimeStr(duration)}</span>
           </div>
         </div>
 
-        {/* Dynamic mini label spec */}
-        <div className="flex items-center gap-2shrink-0">
-          <div className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded bg-accent/10 border border-accent/20">
+        {/* Right Area: Spatial audio and Volume settings */}
+        <div className="flex items-center gap-4 shrink-0 w-full md:w-auto justify-between md:justify-end mt-1 md:mt-0">
+          {/* Dolby badge */}
+          <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded bg-accent/10 border border-accent/20">
             <Sparkles className="w-3 h-3 text-accent animate-spin" style={{ animationDuration: '6s' }} />
             <span className="text-[8.5px] text-accent font-extrabold uppercase font-mono tracking-wider">Dolby HQ Audio</span>
+          </div>
+
+          {/* Volume Control widget */}
+          <div className="flex items-center gap-2 w-full max-w-[130px] md:max-w-[140px] shrink-0">
+            <button onClick={toggleMute} className="text-secondary hover:text-primary transition-colors cursor-pointer shrink-0">
+              {isMuted ? <VolumeX className="w-3.5 h-3.5 text-rose-500" /> : <Volume2 className="w-3.5 h-3.5" />}
+            </button>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={volume}
+              onChange={(e) => setVolume(parseInt(e.target.value))}
+              className="flex-1 h-[3px] bg-border-hover rounded-lg accent-accent cursor-pointer slider-custom"
+              style={{
+                background: `linear-gradient(to right, var(--accent) ${volume}%, var(--bg-tertiary) ${volume}%)`,
+              }}
+            />
+            <span className="text-[8.5px] font-bold font-mono text-muted w-6 text-right shrink-0">{volume}%</span>
           </div>
         </div>
       </footer>
