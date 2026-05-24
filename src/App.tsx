@@ -326,8 +326,43 @@ export default function App() {
     const onError = (e: any) => {
       console.error("Audio core error emitted:", e);
       const audioObj = audioRef.current;
-      if (audioObj && audioObj.src && audioObj.src !== window.location.href) {
-        showToast('❌ Lỗi liên kết: Link nhạc không phản hồi hoặc đã thay đổi mã bảo mật.');
+      if (audioObj) {
+        // If we tried to load with CORS (crossOrigin = anonymous) and failed, try falling back to non-CORS loading!
+        if (audioObj.crossOrigin === 'anonymous' && currentTrackIndex !== -1) {
+          const track = tracks[currentTrackIndex];
+          console.warn("CORS playback failed for", track.title, "- falling back to non-CORS standard streaming.");
+          
+          // Recreate audio WITHOUT CORS
+          const fallbackAudio = recreateAudio(false);
+          if (track.source === 'local') {
+            const storedFile = localFilesMap[track.id];
+            if (storedFile) {
+              const objURL = URL.createObjectURL(storedFile);
+              if (prevObjectURLRef.current) URL.revokeObjectURL(prevObjectURLRef.current);
+              prevObjectURLRef.current = objURL;
+              fallbackAudio.src = objURL;
+            }
+          } else if (track.url) {
+            fallbackAudio.src = track.url;
+          }
+
+          // Play fallback audio
+          fallbackAudio.play()
+            .then(() => {
+              setIsPlaying(true);
+              showToast('✨ Đã tự động kích hoạt chế độ phát dự phòng không CORS cho liên kết này.');
+            })
+            .catch((err) => {
+              console.error("Fallback audio play failed too:", err);
+              showToast('❌ Lỗi liên kết: Không thể nạp nguồn này ngay cả ở chế độ dự phòng.');
+              setIsPlaying(false);
+            });
+          return;
+        }
+
+        if (audioObj.src && audioObj.src !== window.location.href) {
+          showToast('❌ Lỗi liên kết: Link nhạc không phản hồi hoặc đã thay đổi mã bảo mật.');
+        }
       }
       setIsPlaying(false);
     };
@@ -890,10 +925,30 @@ export default function App() {
 
   const handleR2BulkAdd = (url: string, files: string[]) => {
     const items: Track[] = files.map((fileName) => {
+      // If fileName is a full URL, use it directly as the target URL!
+      if (fileName.startsWith('http://') || fileName.startsWith('https://')) {
+        const cleanTitle = fileName.split('/').pop()?.replace(/\?[^/]*$/, '').replace(/\.[^.]+$/, '') || 'R2 Song';
+        return {
+          id: `r2_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          source: 'R2',
+          title: `R2 - ${decodeURIComponent(cleanTitle)}`,
+          artist: 'Cloudflare R2 Bucket',
+          url: fileName,
+        };
+      }
+
+      // Otherwise, construct from bucket URL and file path
       const title = `R2 - ${fileName.replace(/\.[^.]+$/, '')}`;
-      const fullUrl = `${url.replace(/\/$/, '')}/${encodeURIComponent(fileName)}`;
+      
+      // Smart path joining and encoding spaces but keeping directory slashes intact
+      const cleanBase = url.replace(/\/$/, '');
+      const cleanPath = fileName.split('/')
+        .map(segment => encodeURIComponent(segment))
+        .join('/');
+      const fullUrl = `${cleanBase}/${cleanPath}`;
+
       return {
-        id: `r2_${fileName}_${Date.now()}`,
+        id: `r2_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         source: 'R2',
         title,
         artist: 'Cloudflare R2 Bucket',
@@ -902,6 +957,7 @@ export default function App() {
     });
     const updated = [...tracks, ...items];
     savePlaylist(updated);
+    showToast(`✅ Đã đồng bộ thêm ${items.length} bài hát từ R2`);
   };
 
   const handleTrackUpdate = (id: string, updatedFields: Partial<Track>) => {
