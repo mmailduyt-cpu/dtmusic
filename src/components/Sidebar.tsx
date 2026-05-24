@@ -181,7 +181,8 @@ export default function Sidebar({
     // Extract file ID
     const match = driveUrl.match(/[-\w]{25,}/);
     const id = match ? match[0] : driveUrl;
-    const streamUrl = `https://drive.google.com/uc?export=download&id=${id}`;
+    // Sử dụng docs.google.com giúp tăng tốc dòng truyền tải, tương thích cao hơn khi deploy sang máy chủ tĩnh như Vercel
+    const streamUrl = `https://docs.google.com/uc?export=download&id=${id}`;
 
     const rawTitle = driveName.trim() || `Tệp mã ${id.substring(0, 5)}`;
     const title = `Drive - ${rawTitle}`;

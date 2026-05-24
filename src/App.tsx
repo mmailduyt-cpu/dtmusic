@@ -259,12 +259,25 @@ export default function App() {
       audioRef.current.src = '';
     }
 
+    // Khi thay đổi element Audio mới, ta BẮT BUỘC phải dọn dẹp Audio Graph cũ
+    // và tắt hẳn các node cũ để tránh việc không nghe thấy tiếng khi thay đổi nguồn phát.
+    if (audioContextRef.current) {
+      try {
+        audioContextRef.current.close();
+      } catch (err) {
+        console.warn("Failed to close AudioContext:", err);
+      }
+      audioContextRef.current = null;
+      sourceNodeRef.current = null;
+      analyserRef.current = null;
+    }
+
     const audio = new Audio();
     audio.preload = 'metadata';
     if (needsCORS) {
       audio.crossOrigin = 'anonymous';
     } else {
-      audio.crossOrigin = ''; // Native standard resource (no CORS)
+      audio.removeAttribute('crossOrigin');
     }
 
     audio.volume = isMuted ? 0 : volume / 100;
@@ -1006,7 +1019,7 @@ export default function App() {
             </button>
 
             {showThemePanel && (
-              <div className="absolute top-12 right-[-10px] sm:right-0 w-[285px] sm:w-72 bg-secondary/95 backdrop-blur-3xl border border-border/90 p-4 rounded-2xl shadow-2xl space-y-4 animate-in fade-in slide-in-from-top-3 duration-200 text-left">
+              <div className="fixed md:absolute top-16 right-4 left-4 md:left-auto md:top-12 md:right-0 w-auto md:w-72 bg-secondary/95 backdrop-blur-3xl border border-border/90 p-4 rounded-2xl shadow-2xl space-y-4 animate-in fade-in slide-in-from-top-3 duration-200 text-left">
               <div className="flex items-center justify-between border-b border-border/60 pb-2">
                 <span className="text-xs font-black uppercase text-primary tracking-wider flex items-center gap-1.5">
                   <span>🎨</span> Tùy biến giao diện
@@ -1286,10 +1299,8 @@ export default function App() {
                 {activeTrack ? (
                   activeTrack.title
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 text-accent text-[11px] uppercase tracking-widest font-black font-mono">
-                    <Music className="w-3.5 h-3.5 text-accent animate-bounce" />
-                    Duy Thái Studio
-                    <Music4 className="w-3.5 h-3.5 text-accent animate-pulse" />
+                  <span className="text-accent text-[11px] uppercase tracking-widest font-black font-mono">
+                    DTMusic
                   </span>
                 )}
               </h2>
@@ -1415,9 +1426,8 @@ export default function App() {
               {activeTrack ? (
                 activeTrack.title
               ) : (
-                <span className="inline-flex items-center gap-1.5 text-[10px] uppercase font-black tracking-wider text-accent font-mono">
-                  <Music className="w-3.5 h-3.5 animate-pulse text-accent" />
-                  DUY THÁI STUDIO
+                <span className="text-[10px] uppercase font-black tracking-wider text-accent font-mono">
+                  DTMusic
                 </span>
               )}
             </h4>
@@ -1427,40 +1437,19 @@ export default function App() {
           </div>
         </div>
 
-        {/* Center: Beautiful interactive speaker patterns & geometric waveform lines */}
-        <div className="hidden md:flex items-center gap-3">
-          <div className="flex items-center gap-1 text-secondary/60">
-            <Volume2 className={`w-3.5 h-3.5 transition-all ${isPlaying ? 'text-accent scale-110 animate-bounce' : 'text-muted'}`} />
-            <div className={`flex items-center gap-0.5 h-4 px-1 ${isPlaying ? 'opacity-100' : 'opacity-30'}`}>
-              <span className="w-[1.5px] bg-accent/80 h-1 rounded animate-pulse" />
-              <span className="w-[1.5px] bg-accent/80 h-3.5 rounded animate-bounce" style={{ animationDuration: '0.8s' }} />
-              <span className="w-[1.5px] bg-accent/80 h-2 rounded animate-pulse" />
-              <span className="w-[1.5px] bg-accent/80 h-4 rounded animate-bounce" style={{ animationDuration: '0.6s' }} />
-              <span className="w-[1.5px] bg-accent/80 h-1.5 rounded animate-pulse" />
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2 px-3 py-1 bg-accent/5 rounded-full border border-accent/20 shadow-[0_0_12px_rgba(167,139,250,0.12)] transition-all">
-            <span className="relative flex h-1.5 w-1.5 shrink-0">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75 ${isPlaying ? 'block' : 'hidden'}`}></span>
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-accent"></span>
-            </span>
-            <Music4 className={`w-3.5 h-3.5 text-accent transition-all shrink-0 ${isPlaying ? 'animate-bounce' : 'opacity-60'}`} />
-            <span className="text-[9px] text-accent font-black tracking-widest uppercase font-mono flex items-center gap-1 select-none">
-              SÓNG NHẠC Hi-Res
-            </span>
-            <Disc className={`w-3.5 h-3.5 text-accent transition-all shrink-0 ${isPlaying ? 'animate-spin' : 'opacity-60'}`} style={{ animationDuration: '3s' }} />
-          </div>
-
-          <div className="flex items-center gap-1 text-secondary/60">
-            <div className={`flex items-center gap-0.5 h-4 px-1 ${isPlaying ? 'opacity-100' : 'opacity-30'}`}>
-              <span className="w-[1.5px] bg-accent/80 h-2.5 rounded animate-bounce" style={{ animationDuration: '0.7s' }} />
-              <span className="w-[1.5px] bg-accent/80 h-1 rounded animate-pulse" />
-              <span className="w-[1.5px] bg-accent/80 h-3.5 rounded animate-bounce" style={{ animationDuration: '0.9s' }} />
-              <span className="w-[1.5px] bg-accent/80 h-1.5 rounded animate-pulse" />
-              <span className="w-[1.5px] bg-accent/80 h-3 rounded animate-bounce" style={{ animationDuration: '0.5s' }} />
-            </div>
-            <Volume2 className={`w-3.5 h-3.5 transition-all ${isPlaying ? 'text-accent scale-110 animate-bounce' : 'text-muted'}`} style={{ animationDelay: '0.3s' }} />
+        {/* Center: Minimalist ambient digital visual wave */}
+        <div className="hidden md:flex items-center gap-1.5 h-5 px-3 bg-accent/5 rounded-full border border-border/40 shrink-0">
+          <div className={`flex items-center gap-0.5 h-4 ${isPlaying ? 'opacity-100' : 'opacity-35'}`}>
+            <span className="w-[1.5px] bg-accent/80 h-1 rounded animate-pulse" />
+            <span className="w-[1.5px] bg-accent/80 h-3.5 rounded animate-bounce" style={{ animationDuration: '0.8s' }} />
+            <span className="w-[1.5px] bg-accent/80 h-2 rounded animate-pulse" />
+            <span className="w-[1.5px] bg-accent/80 h-4 rounded animate-bounce" style={{ animationDuration: '0.6s' }} />
+            <span className="w-[1.5px] bg-accent/80 h-1.5 rounded animate-pulse" />
+            <span className="w-[1.5px] bg-accent/80 h-3 rounded animate-bounce" style={{ animationDuration: '0.7s' }} />
+            <span className="w-[1.5px] bg-accent/80 h-1 rounded animate-pulse" />
+            <span className="w-[1.5px] bg-accent/80 h-3.5 rounded animate-bounce" style={{ animationDuration: '0.9s' }} />
+            <span className="w-[1.5px] bg-accent/80 h-1.5 rounded animate-pulse" />
+            <span className="w-[1.5px] bg-accent/80 h-3 rounded animate-bounce" style={{ animationDuration: '0.5s' }} />
           </div>
         </div>
 
