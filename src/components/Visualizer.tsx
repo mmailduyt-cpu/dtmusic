@@ -47,17 +47,40 @@ export default function Visualizer({ analyser, isPlaying }: VisualizerProps) {
       const height = canvas.height;
       ctx.clearRect(0, 0, width, height);
 
-      if (!analyser || !isPlaying) {
-        // Draw standard subtle idle wave
-        ctx.beginPath();
-        ctx.strokeStyle = 'rgba(167, 139, 250, 0.2)'; // Tailwind violet-400
-        ctx.lineWidth = 2;
-        ctx.moveTo(0, height / 2);
-        for (let i = 0; i < width; i++) {
-          const y = height / 2 + Math.sin(i * 0.02 + Date.now() * 0.004) * 4;
-          ctx.lineTo(i, y);
+      if (!analyser) {
+        if (!isPlaying) {
+          // Draw standard subtle idle wave
+          ctx.beginPath();
+          ctx.strokeStyle = 'rgba(167, 139, 250, 0.15)'; // Tailwind violet-400
+          ctx.lineWidth = 2;
+          ctx.moveTo(0, height / 2);
+          for (let i = 0; i < width; i++) {
+            const y = height / 2 + Math.sin(i * 0.02 + Date.now() * 0.001) * 2;
+            ctx.lineTo(i, y);
+          }
+          ctx.stroke();
+          return;
         }
-        ctx.stroke();
+
+        // Draw multiple beautiful, dynamic simulated waveforms representing active cloud stream action
+        const time = Date.now() * 0.003;
+        const waves = [
+          { freq: 0.012, amp: height * 0.35, speed: 1.2, color: 'rgba(167, 139, 250, 0.6)' }, // violet-400
+          { freq: 0.022, amp: height * 0.25, speed: -0.9, color: 'rgba(216, 180, 254, 0.4)' }, // purple-300
+          { freq: 0.007, amp: height * 0.20, speed: 1.8, color: 'rgba(124, 58, 237, 0.3)' }   // violet-600
+        ];
+
+        waves.forEach((w) => {
+          ctx.beginPath();
+          ctx.strokeStyle = w.color;
+          ctx.lineWidth = 2;
+          ctx.moveTo(0, height / 2);
+          for (let i = 0; i < width; i++) {
+            const y = height / 2 + Math.sin(i * w.freq + time * w.speed) * w.amp;
+            ctx.lineTo(i, y);
+          }
+          ctx.stroke();
+        });
         return;
       }
 

@@ -96,6 +96,8 @@ export default function App() {
 
   // Refs for permanent Audio persistence
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const localAudioRef = useRef<HTMLAudioElement | null>(null);
+  const cloudAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const filtersRef = useRef<BiquadFilterNode[]>([]);
@@ -246,14 +248,22 @@ export default function App() {
 
   // Initialize the native Audio instance ONCE on mount (Solves multi-context failures)
   useEffect(() => {
-    const audio = new Audio();
-    audio.crossOrigin = 'anonymous';
-    audio.preload = 'metadata';
-    audioRef.current = audio;
+    const localAudio = new Audio();
+    localAudio.crossOrigin = 'anonymous';
+    localAudio.preload = 'metadata';
+    localAudioRef.current = localAudio;
+
+    const cloudAudio = new Audio();
+    cloudAudio.preload = 'metadata';
+    cloudAudioRef.current = cloudAudio;
+
+    audioRef.current = localAudio;
 
     return () => {
-      audio.pause();
-      audio.src = '';
+      localAudio.pause();
+      localAudio.src = '';
+      cloudAudio.pause();
+      cloudAudio.src = '';
       if (prevObjectURLRef.current) {
         URL.revokeObjectURL(prevObjectURLRef.current);
       }
@@ -438,8 +448,11 @@ export default function App() {
       const targetGain = isMuted ? 0 : volume / 100;
       gainNodeRef.current.gain.setValueAtTime(targetGain, audioContextRef.current.currentTime);
     }
-    if (audioRef.current) {
-      audioRef.current.volume = isMuted ? 0 : volume / 100;
+    if (localAudioRef.current) {
+      localAudioRef.current.volume = isMuted ? 0 : volume / 100;
+    }
+    if (cloudAudioRef.current) {
+      cloudAudioRef.current.volume = isMuted ? 0 : volume / 100;
     }
   }, [volume, isMuted]);
 
@@ -490,10 +503,31 @@ export default function App() {
 
   // Load and play a specific track
   const playTrack = async (index: number) => {
-    if (index < 0 || index >= tracks.length || !audioRef.current) return;
+    if (index < 0 || index >= tracks.length) return;
 
     setCurrentTrackIndex(index);
     const track = tracks[index];
+    const isCloud = track.source !== 'local';
+
+    // To avoid CORS block silencing in Web Audio contexts,
+    // we play cloud-hosted (Drive, Dropbox, R2) tracks directly in an uncaptured cloud audio element,
+    // while same-origin local files use the Web Audio-enabled graph for EQ/Visualizer analysis.
+    if (isCloud) {
+      if (localAudioRef.current) {
+        localAudioRef.current.pause();
+        localAudioRef.current.src = '';
+      }
+      audioRef.current = cloudAudioRef.current;
+    } else {
+      if (cloudAudioRef.current) {
+        cloudAudioRef.current.pause();
+        cloudAudioRef.current.src = '';
+      }
+      audioRef.current = localAudioRef.current;
+    }
+
+    const audio = audioRef.current;
+    if (!audio) return;
 
     // Reset layout playback states
     setCurrentTime(0);
@@ -510,19 +544,19 @@ export default function App() {
         }
         const objURL = URL.createObjectURL(storedFile);
         prevObjectURLRef.current = objURL;
-        audioRef.current.crossOrigin = '';
-        audioRef.current.src = objURL;
+        audio.crossOrigin = '';
+        audio.src = objURL;
       } else {
         showToast('⚠️ Bài hát local bị thiếu tệp tin. Vui lòng nhấp "Cần chọn lại tệp" để tải lại.');
         setIsPlaying(false);
         return;
       }
     } else {
-      audioRef.current.crossOrigin = 'anonymous';
+      audio.crossOrigin = ''; // Reset CORS header settings — fetch without CORS limits!
       if (track.url) {
-        audioRef.current.src = track.url;
+        audio.src = track.url;
       } else {
-        audioRef.current.src = '';
+        audio.src = '';
       }
     }
 
@@ -530,13 +564,15 @@ export default function App() {
     setShowSidebar(false);
 
     try {
-      // Lazy start nodes
-      initAudioGraph();
-      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-        await audioContextRef.current.resume();
+      if (!isCloud) {
+        // Lazy start nodes only for local tracks supporting spectrum analyze
+        initAudioGraph();
+        if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+          await audioContextRef.current.resume();
+        }
       }
 
-      await audioRef.current.play();
+      await audio.play();
       setIsPlaying(true);
       fetchLyricsForTrack(track, index);
     } catch (e) {
@@ -939,7 +975,7 @@ export default function App() {
       />
 
       {/* ══ MAIN WORKSPACE ══ */}
-      <main id="main" className="relative flex flex-col justify-center items-center bg-primary overflow-hidden md:border-l border-border px-4 py-4 md:p-8 w-full h-full">
+      <main id="main" className="relative flex flex-col justify-center items-center bg-primary overflow-hidden md:border-l border-border px-4 py-4 md:p-8 w-full flex-1 md:h-full min-h-0">
         
         {/* Mobile menu floating toggle button on the top-left */}
         <div className="md:hidden absolute top-4 left-4 z-40">
@@ -991,7 +1027,7 @@ export default function App() {
           </button>
 
           {showThemePanel && (
-            <div className="absolute top-12 right-0 w-72 bg-secondary/95 backdrop-blur-3xl border border-border/90 p-4 rounded-2xl shadow-2xl space-y-4 animate-in fade-in slide-in-from-top-3 duration-200 text-left">
+            <div className="fixed md:absolute top-16 right-4 left-4 md:left-auto md:top-12 md:right-0 w-auto md:w-72 bg-secondary/95 backdrop-blur-3xl border border-border/90 p-4 rounded-2xl shadow-2xl space-y-4 animate-in fade-in slide-in-from-top-3 duration-200 text-left">
               <div className="flex items-center justify-between border-b border-border/60 pb-2">
                 <span className="text-xs font-black uppercase text-primary tracking-wider flex items-center gap-1.5">
                   <span>🎨</span> Tùy biến giao diện
@@ -1205,7 +1241,7 @@ export default function App() {
         <Visualizer analyser={analyserRef.current} isPlaying={isPlaying} />
 
         {/* Disc Rotate vinyl container centering */}
-        <div className="relative z-10 flex flex-col items-center max-w-sm w-full h-full justify-center md:justify-between py-2 md:py-6 gap-3 md:gap-4">
+        <div className="relative z-10 flex flex-col items-center max-w-sm w-full h-[95%] md:h-full justify-center md:justify-between py-2 pb-6 md:py-6 md:pb-0 gap-3 md:gap-4">
           
           {/* Centered Vinyl disc block with Aura radial backdrop */}
           <div className="flex-1 flex items-center justify-center w-full min-h-[160px] md:min-h-[220px]">
@@ -1396,16 +1432,39 @@ export default function App() {
           </div>
         </div>
 
-        {/* Center: Subtle active wave badge instead of duplicate controllers */}
-        <div className="hidden md:flex items-center gap-2">
-          <div className={`flex items-center gap-0.5 h-3 ${isPlaying ? 'opacity-100' : 'opacity-40'}`}>
-            <span className="w-0.5 bg-accent rounded-full animate-pulse h-1" style={{ animationDelay: '0.1s' }} />
-            <span className="w-0.5 bg-accent rounded-full animate-bounce h-2.5" />
-            <span className="w-0.5 bg-accent rounded-full animate-pulse h-1.5" style={{ animationDelay: '0.3s' }} />
-            <span className="w-0.5 bg-accent rounded-full animate-bounce h-3" style={{ animationDelay: '0.2s' }} />
-            <span className="w-0.5 bg-accent rounded-full animate-pulse h-2" style={{ animationDelay: '0.4s' }} />
+        {/* Center: Beautiful interactive speaker patterns & geometric waveform lines */}
+        <div className="hidden md:flex items-center gap-4">
+          <div className="flex items-center gap-1.5 text-secondary/60">
+            <Volume2 className={`w-3.5 h-3.5 transition-all ${isPlaying ? 'text-accent scale-110 animate-bounce' : 'text-muted'}`} />
+            <div className={`flex items-center gap-0.5 h-4 px-1 ${isPlaying ? 'opacity-100' : 'opacity-30'}`}>
+              <span className="w-[1.5px] bg-accent/80 h-1 rounded animate-pulse" />
+              <span className="w-[1.5px] bg-accent/80 h-3.5 rounded animate-bounce" style={{ animationDuration: '0.8s' }} />
+              <span className="w-[1.5px] bg-accent/80 h-2 rounded animate-pulse" />
+              <span className="w-[1.5px] bg-accent/80 h-4 rounded animate-bounce" style={{ animationDuration: '0.6s' }} />
+              <span className="w-[1.5px] bg-accent/80 h-1.5 rounded animate-pulse" />
+              <span className="w-[1.5px] bg-accent/80 h-3 rounded animate-bounce" style={{ animationDuration: '0.9s' }} />
+              <span className="w-[1.5px] bg-accent/80 h-1 rounded animate-pulse" />
+            </div>
+            <Volume2 className={`w-3.5 h-3.5 transition-all hidden lg:block ${isPlaying ? 'text-accent scale-110 animate-pulse' : 'text-muted'}`} />
           </div>
-          <span className="text-[9px] text-secondary font-bold font-mono tracking-wider uppercase">SÓNG NHẠC CHẤT LƯỢNG CAO</span>
+          
+          <div className="flex items-center gap-1 text-[10px] text-muted/50 font-mono tracking-widest select-none">
+            <span>━━━</span>
+            <span className="text-[8px] text-accent font-extrabold animate-pulse">✦ DT-STUDIO ✦</span>
+            <span>━━━</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-secondary/60">
+            <Volume2 className={`w-3.5 h-3.5 transition-all hidden lg:block ${isPlaying ? 'text-accent scale-110 animate-pulse' : 'text-muted'}`} style={{ animationDelay: '0.2s' }} />
+            <div className={`flex items-center gap-0.5 h-4 px-1 ${isPlaying ? 'opacity-100' : 'opacity-30'}`}>
+              <span className="w-[1.5px] bg-accent/80 h-2.5 rounded animate-bounce" style={{ animationDuration: '0.7s' }} />
+              <span className="w-[1.5px] bg-accent/80 h-1 rounded animate-pulse" />
+              <span className="w-[1.5px] bg-accent/80 h-3.5 rounded animate-bounce" style={{ animationDuration: '0.9s' }} />
+              <span className="w-[1.5px] bg-accent/80 h-1.5 rounded animate-pulse" />
+              <span className="w-[1.5px] bg-accent/80 h-3 rounded animate-bounce" style={{ animationDuration: '0.5s' }} />
+            </div>
+            <Volume2 className={`w-3.5 h-3.5 transition-all ${isPlaying ? 'text-accent scale-110 animate-bounce' : 'text-muted'}`} style={{ animationDelay: '0.3s' }} />
+          </div>
         </div>
 
         {/* Right Area: Spatial audio and Volume settings */}
