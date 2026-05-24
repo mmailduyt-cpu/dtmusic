@@ -14,6 +14,7 @@ import {
   Moon,
   Sun,
   Music4,
+  Music,
   Sparkles
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
@@ -244,25 +245,57 @@ export default function App() {
     localStorage.setItem('snhac_playlist', JSON.stringify(serializable));
   };
 
-  // Initialize the native Audio instance ONCE on mount (Solves multi-context failures)
-  useEffect(() => {
+  // Stateful Audio element recreation framework
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+
+  const recreateAudio = (needsCORS: boolean): HTMLAudioElement => {
+    const currentCORS = audioRef.current?.crossOrigin === 'anonymous';
+    if (audioRef.current && currentCORS === needsCORS) {
+      return audioRef.current;
+    }
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+    }
+
     const audio = new Audio();
-    audio.crossOrigin = 'anonymous';
     audio.preload = 'metadata';
+    if (needsCORS) {
+      audio.crossOrigin = 'anonymous';
+    } else {
+      audio.crossOrigin = ''; // Native standard resource (no CORS)
+    }
+
+    audio.volume = isMuted ? 0 : volume / 100;
+
     audioRef.current = audio;
+    setAudioElement(audio);
+    return audio;
+  };
+
+  const isTrackCORSCompatible = (source: string) => {
+    return source === 'local' || source === 'R2';
+  };
+
+  // Initialize the native Audio instance ONCE on mount
+  useEffect(() => {
+    recreateAudio(true);
 
     return () => {
-      audio.pause();
-      audio.src = '';
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
       if (prevObjectURLRef.current) {
         URL.revokeObjectURL(prevObjectURLRef.current);
       }
     };
   }, []);
 
-  // Sync listener callbacks to the persistent Audio element
+  // Sync listener callbacks to the active stateful Audio element
   useEffect(() => {
-    const audio = audioRef.current;
+    const audio = audioElement;
     if (!audio) return;
 
     const onTimeUpdate = () => {
@@ -279,51 +312,9 @@ export default function App() {
 
     const onError = (e: any) => {
       console.error("Audio core error emitted:", e);
-      
       const audioObj = audioRef.current;
-      if (!audioObj) return;
-
-      if (audioObj.crossOrigin === 'anonymous') {
-        console.warn("CORS policy blocked direct access. Retrying in safe legacy streaming mode...");
-        audioObj.crossOrigin = ''; // Reset CORS header settings
-        
-        // Reload source with fresh headers configuration
-        let srcBackup = audioObj.src;
-        // Decode raw URL if it was routed through the proxy
-        if (srcBackup && srcBackup.includes('/api/proxy?url=')) {
-          try {
-            const urlObj = new URL(srcBackup);
-            const rawUrl = urlObj.searchParams.get('url');
-            if (rawUrl) {
-              srcBackup = rawUrl;
-            }
-          } catch (err) {
-            console.warn("Failed to parse fallback URL:", err);
-          }
-        }
-        
-        audioObj.src = '';
-        audioObj.load();
-        
-        audioObj.src = srcBackup;
-        audioObj.load();
-        
-        audioObj.play()
-          .then(() => {
-            setIsPlaying(true);
-            showToast('🎵 Chế độ tương thích: Đang phát (EQ & Visualizer tạm tắt cho nguồn trực tuyến này).');
-          })
-          .catch((retryErr) => {
-            console.error("Safe mode fallback failure:", retryErr);
-            showToast('❌ Lỗi liên kết: Link nhạc không phản hồi hoặc đã thay đổi mã bảo mật.');
-            setIsPlaying(false);
-          });
-        return;
-      }
-
-      // Ensure we only emit CORS or faulty-link message when a valid stream is active
-      if (audioObj.src && audioObj.src !== window.location.href) {
-        showToast('❌ Không thể phát file âm thanh này. Hãy kiểm tra lại liên kết đám mây.');
+      if (audioObj && audioObj.src && audioObj.src !== window.location.href) {
+        showToast('❌ Lỗi liên kết: Link nhạc không phản hồi hoặc đã thay đổi mã bảo mật.');
       }
       setIsPlaying(false);
     };
@@ -339,7 +330,7 @@ export default function App() {
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('error', onError);
     };
-  }, [tracks, currentTrackIndex, repeatMode, isShuffle]);
+  }, [audioElement, tracks, currentTrackIndex, repeatMode, isShuffle]);
 
   // Maintain Live Equalizer Node graph
   const initAudioGraph = () => {
@@ -507,9 +498,10 @@ export default function App() {
 
     setCurrentTrackIndex(index);
     const track = tracks[index];
-    const isCloud = track.source !== 'local';
+    const needsCORS = isTrackCORSCompatible(track.source);
 
-    const audio = audioRef.current;
+    // Dynamic recreation to prevent CORS block or capture mismatches
+    const audio = recreateAudio(needsCORS);
 
     // Reset layout playback states
     setCurrentTime(0);
@@ -526,7 +518,6 @@ export default function App() {
         }
         const objURL = URL.createObjectURL(storedFile);
         prevObjectURLRef.current = objURL;
-        audio.crossOrigin = 'anonymous';
         audio.src = objURL;
       } else {
         showToast('⚠️ Bài hát local bị thiếu tệp tin. Vui lòng nhấp "Cần chọn lại tệp" để tải lại.');
@@ -534,14 +525,9 @@ export default function App() {
         return;
       }
     } else {
-      // Use proxy stream for Cloud URLs (Google Drive, Dropbox, OneDrive, R2) to ensure CORS-free streaming with visualizer
-      audio.crossOrigin = 'anonymous';
       if (track.url) {
-        if (track.url.startsWith('http') && !track.url.includes('/api/proxy')) {
-          audio.src = `/api/proxy?url=${encodeURIComponent(track.url)}`;
-        } else {
-          audio.src = track.url;
-        }
+        // Direct media streaming without proxying avoids Vercel paywall, 10s serverless cuts, or 4.5MB size caps
+        audio.src = track.url;
       } else {
         audio.src = '';
       }
@@ -551,10 +537,12 @@ export default function App() {
     setShowSidebar(false);
 
     try {
-      // Lazy start nodes for all tracks (now including cloud tracks as they are securely proxied with CORS support!)
-      initAudioGraph();
-      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-        await audioContextRef.current.resume();
+      // Lazy start Web Audio graph nodes only for CORS-capable sources (Local, R2)
+      if (needsCORS) {
+        initAudioGraph();
+        if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+          await audioContextRef.current.resume();
+        }
       }
 
       await audio.play();
@@ -579,9 +567,14 @@ export default function App() {
         return;
       }
       try {
-        initAudioGraph();
-        if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-          await audioContextRef.current.resume();
+        const currentTrack = tracks[currentTrackIndex];
+        const needsCORS = currentTrack ? isTrackCORSCompatible(currentTrack.source) : true;
+        
+        if (needsCORS) {
+          initAudioGraph();
+          if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+            await audioContextRef.current.resume();
+          }
         }
         await audio.play();
         setIsPlaying(true);
@@ -1003,16 +996,17 @@ export default function App() {
 
         {/* 🎨 PREMIUM DYNAMIC CUSTOMIZER FLUID BUTTON & POPOVER PANEL */}
         <div className="absolute top-4 right-4 z-40">
-          <button
-            onClick={() => setShowThemePanel(!showThemePanel)}
-            className="w-10 h-10 rounded-full bg-secondary/85 hover:bg-accent/20 border border-border/80 text-accent hover:text-accent-glow flex items-center justify-center shadow-[0_4px_15px_rgba(0,0,0,0.3)] backdrop-blur-xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
-            title="Đổi chủ đề & nghệ thuật hình nền Lofi"
-          >
-            <Sparkles className="w-5 h-5 animate-pulse" />
-          </button>
+          <div className="relative flex flex-col items-end">
+            <button
+              onClick={() => setShowThemePanel(!showThemePanel)}
+              className="w-10 h-10 rounded-full bg-secondary/85 hover:bg-accent/20 border border-border/80 text-accent hover:text-accent-glow flex items-center justify-center shadow-[0_4px_15px_rgba(0,0,0,0.3)] backdrop-blur-xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
+              title="Đổi chủ đề & nghệ thuật hình nền Lofi"
+            >
+              <Sparkles className="w-5 h-5 animate-pulse" />
+            </button>
 
-          {showThemePanel && (
-            <div className="absolute top-12 right-0 w-[290px] sm:w-72 bg-secondary/95 backdrop-blur-3xl border border-border/90 p-4 rounded-2xl shadow-2xl space-y-4 animate-in fade-in slide-in-from-top-3 duration-200 text-left">
+            {showThemePanel && (
+              <div className="absolute top-12 right-[-10px] sm:right-0 w-[285px] sm:w-72 bg-secondary/95 backdrop-blur-3xl border border-border/90 p-4 rounded-2xl shadow-2xl space-y-4 animate-in fade-in slide-in-from-top-3 duration-200 text-left">
               <div className="flex items-center justify-between border-b border-border/60 pb-2">
                 <span className="text-xs font-black uppercase text-primary tracking-wider flex items-center gap-1.5">
                   <span>🎨</span> Tùy biến giao diện
@@ -1187,6 +1181,7 @@ export default function App() {
               </div>
             </div>
           )}
+          </div>
         </div>
 
         {/* EQ Popover Modal */}
@@ -1223,7 +1218,7 @@ export default function App() {
         />
 
         {/* Visualizers canvas at the bottom */}
-        <Visualizer analyser={analyserRef.current} isPlaying={isPlaying} />
+        <Visualizer analyser={analyserRef.current} isPlaying={isPlaying} isSimulated={activeTrack ? !isTrackCORSCompatible(activeTrack.source) : false} />
 
         {/* Disc Rotate vinyl container centering */}
         <div className="relative z-10 flex flex-col items-center max-w-sm w-full h-[95%] md:h-full justify-center md:justify-between py-2 pb-6 md:py-6 md:pb-0 gap-3 md:gap-4">
@@ -1288,7 +1283,15 @@ export default function App() {
             {/* TEXT HEADLINE */}
             <div className="text-center w-full px-1">
               <h2 className="text-xs md:text-md font-extrabold tracking-tight text-primary truncate max-w-xs mx-auto mb-0.5">
-                {activeTrack ? activeTrack.title : 'DTMusic Player'}
+                {activeTrack ? (
+                  activeTrack.title
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-accent text-[11px] uppercase tracking-widest font-black font-mono">
+                    <Music className="w-3.5 h-3.5 text-accent animate-bounce" />
+                    Duy Thái Studio
+                    <Music4 className="w-3.5 h-3.5 text-accent animate-pulse" />
+                  </span>
+                )}
               </h2>
               <p className="text-[9.5px] md:text-[11px] text-muted truncate max-w-xs mx-auto min-h-[14px]">
                 {activeTrack ? activeTrack.artist : 'Thả nhạc hoặc nhập đường dẫn đám mây'}
@@ -1409,7 +1412,14 @@ export default function App() {
           </div>
           <div className="min-w-0">
             <h4 className="text-xs font-semibold text-primary truncate max-w-[130px] md:max-w-[180px]">
-              {activeTrack ? activeTrack.title : 'DTMusic Player'}
+              {activeTrack ? (
+                activeTrack.title
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-[10px] uppercase font-black tracking-wider text-accent font-mono">
+                  <Music className="w-3.5 h-3.5 animate-pulse text-accent" />
+                  DUY THÁI STUDIO
+                </span>
+              )}
             </h4>
             <p className="text-[10px] text-muted truncate max-w-[130px] md:max-w-[180px]">
               {activeTrack ? activeTrack.artist : 'Chưa chọn bài hát'}

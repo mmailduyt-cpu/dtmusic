@@ -3,9 +3,10 @@ import { useEffect, useRef } from 'react';
 interface VisualizerProps {
   analyser: AnalyserNode | null;
   isPlaying: boolean;
+  isSimulated?: boolean;
 }
 
-export default function Visualizer({ analyser, isPlaying }: VisualizerProps) {
+export default function Visualizer({ analyser, isPlaying, isSimulated }: VisualizerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameId = useRef<number | null>(null);
@@ -47,7 +48,7 @@ export default function Visualizer({ analyser, isPlaying }: VisualizerProps) {
       const height = canvas.height;
       ctx.clearRect(0, 0, width, height);
 
-      if (!analyser) {
+      if (!analyser || isSimulated) {
         if (!isPlaying) {
           // Draw standard subtle idle wave
           ctx.beginPath();
