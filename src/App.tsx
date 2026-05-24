@@ -96,8 +96,6 @@ export default function App() {
 
   // Refs for permanent Audio persistence
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const localAudioRef = useRef<HTMLAudioElement | null>(null);
-  const cloudAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const filtersRef = useRef<BiquadFilterNode[]>([]);
@@ -248,22 +246,14 @@ export default function App() {
 
   // Initialize the native Audio instance ONCE on mount (Solves multi-context failures)
   useEffect(() => {
-    const localAudio = new Audio();
-    localAudio.crossOrigin = 'anonymous';
-    localAudio.preload = 'metadata';
-    localAudioRef.current = localAudio;
-
-    const cloudAudio = new Audio();
-    cloudAudio.preload = 'metadata';
-    cloudAudioRef.current = cloudAudio;
-
-    audioRef.current = localAudio;
+    const audio = new Audio();
+    audio.crossOrigin = 'anonymous';
+    audio.preload = 'metadata';
+    audioRef.current = audio;
 
     return () => {
-      localAudio.pause();
-      localAudio.src = '';
-      cloudAudio.pause();
-      cloudAudio.src = '';
+      audio.pause();
+      audio.src = '';
       if (prevObjectURLRef.current) {
         URL.revokeObjectURL(prevObjectURLRef.current);
       }
@@ -298,7 +288,20 @@ export default function App() {
         audioObj.crossOrigin = ''; // Reset CORS header settings
         
         // Reload source with fresh headers configuration
-        const srcBackup = audioObj.src;
+        let srcBackup = audioObj.src;
+        // Decode raw URL if it was routed through the proxy
+        if (srcBackup && srcBackup.includes('/api/proxy?url=')) {
+          try {
+            const urlObj = new URL(srcBackup);
+            const rawUrl = urlObj.searchParams.get('url');
+            if (rawUrl) {
+              srcBackup = rawUrl;
+            }
+          } catch (err) {
+            console.warn("Failed to parse fallback URL:", err);
+          }
+        }
+        
         audioObj.src = '';
         audioObj.load();
         
@@ -448,11 +451,8 @@ export default function App() {
       const targetGain = isMuted ? 0 : volume / 100;
       gainNodeRef.current.gain.setValueAtTime(targetGain, audioContextRef.current.currentTime);
     }
-    if (localAudioRef.current) {
-      localAudioRef.current.volume = isMuted ? 0 : volume / 100;
-    }
-    if (cloudAudioRef.current) {
-      cloudAudioRef.current.volume = isMuted ? 0 : volume / 100;
+    if (audioRef.current) {
+      audioRef.current.volume = isMuted ? 0 : volume / 100;
     }
   }, [volume, isMuted]);
 
@@ -503,31 +503,13 @@ export default function App() {
 
   // Load and play a specific track
   const playTrack = async (index: number) => {
-    if (index < 0 || index >= tracks.length) return;
+    if (index < 0 || index >= tracks.length || !audioRef.current) return;
 
     setCurrentTrackIndex(index);
     const track = tracks[index];
     const isCloud = track.source !== 'local';
 
-    // To avoid CORS block silencing in Web Audio contexts,
-    // we play cloud-hosted (Drive, Dropbox, R2) tracks directly in an uncaptured cloud audio element,
-    // while same-origin local files use the Web Audio-enabled graph for EQ/Visualizer analysis.
-    if (isCloud) {
-      if (localAudioRef.current) {
-        localAudioRef.current.pause();
-        localAudioRef.current.src = '';
-      }
-      audioRef.current = cloudAudioRef.current;
-    } else {
-      if (cloudAudioRef.current) {
-        cloudAudioRef.current.pause();
-        cloudAudioRef.current.src = '';
-      }
-      audioRef.current = localAudioRef.current;
-    }
-
     const audio = audioRef.current;
-    if (!audio) return;
 
     // Reset layout playback states
     setCurrentTime(0);
@@ -544,7 +526,7 @@ export default function App() {
         }
         const objURL = URL.createObjectURL(storedFile);
         prevObjectURLRef.current = objURL;
-        audio.crossOrigin = '';
+        audio.crossOrigin = 'anonymous';
         audio.src = objURL;
       } else {
         showToast('⚠️ Bài hát local bị thiếu tệp tin. Vui lòng nhấp "Cần chọn lại tệp" để tải lại.');
@@ -552,9 +534,14 @@ export default function App() {
         return;
       }
     } else {
-      audio.crossOrigin = ''; // Reset CORS header settings — fetch without CORS limits!
+      // Use proxy stream for Cloud URLs (Google Drive, Dropbox, OneDrive, R2) to ensure CORS-free streaming with visualizer
+      audio.crossOrigin = 'anonymous';
       if (track.url) {
-        audio.src = track.url;
+        if (track.url.startsWith('http') && !track.url.includes('/api/proxy')) {
+          audio.src = `/api/proxy?url=${encodeURIComponent(track.url)}`;
+        } else {
+          audio.src = track.url;
+        }
       } else {
         audio.src = '';
       }
@@ -564,12 +551,10 @@ export default function App() {
     setShowSidebar(false);
 
     try {
-      if (!isCloud) {
-        // Lazy start nodes only for local tracks supporting spectrum analyze
-        initAudioGraph();
-        if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-          await audioContextRef.current.resume();
-        }
+      // Lazy start nodes for all tracks (now including cloud tracks as they are securely proxied with CORS support!)
+      initAudioGraph();
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
       }
 
       await audio.play();
@@ -1017,7 +1002,7 @@ export default function App() {
         />
 
         {/* 🎨 PREMIUM DYNAMIC CUSTOMIZER FLUID BUTTON & POPOVER PANEL */}
-        <div className="absolute top-4 right-4 z-40 relative">
+        <div className="absolute top-4 right-4 z-40">
           <button
             onClick={() => setShowThemePanel(!showThemePanel)}
             className="w-10 h-10 rounded-full bg-secondary/85 hover:bg-accent/20 border border-border/80 text-accent hover:text-accent-glow flex items-center justify-center shadow-[0_4px_15px_rgba(0,0,0,0.3)] backdrop-blur-xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
@@ -1027,7 +1012,7 @@ export default function App() {
           </button>
 
           {showThemePanel && (
-            <div className="fixed md:absolute top-16 right-4 left-4 md:left-auto md:top-12 md:right-0 w-auto md:w-72 bg-secondary/95 backdrop-blur-3xl border border-border/90 p-4 rounded-2xl shadow-2xl space-y-4 animate-in fade-in slide-in-from-top-3 duration-200 text-left">
+            <div className="absolute top-12 right-0 w-[290px] sm:w-72 bg-secondary/95 backdrop-blur-3xl border border-border/90 p-4 rounded-2xl shadow-2xl space-y-4 animate-in fade-in slide-in-from-top-3 duration-200 text-left">
               <div className="flex items-center justify-between border-b border-border/60 pb-2">
                 <span className="text-xs font-black uppercase text-primary tracking-wider flex items-center gap-1.5">
                   <span>🎨</span> Tùy biến giao diện
@@ -1433,8 +1418,8 @@ export default function App() {
         </div>
 
         {/* Center: Beautiful interactive speaker patterns & geometric waveform lines */}
-        <div className="hidden md:flex items-center gap-4">
-          <div className="flex items-center gap-1.5 text-secondary/60">
+        <div className="hidden md:flex items-center gap-3">
+          <div className="flex items-center gap-1 text-secondary/60">
             <Volume2 className={`w-3.5 h-3.5 transition-all ${isPlaying ? 'text-accent scale-110 animate-bounce' : 'text-muted'}`} />
             <div className={`flex items-center gap-0.5 h-4 px-1 ${isPlaying ? 'opacity-100' : 'opacity-30'}`}>
               <span className="w-[1.5px] bg-accent/80 h-1 rounded animate-pulse" />
@@ -1442,20 +1427,22 @@ export default function App() {
               <span className="w-[1.5px] bg-accent/80 h-2 rounded animate-pulse" />
               <span className="w-[1.5px] bg-accent/80 h-4 rounded animate-bounce" style={{ animationDuration: '0.6s' }} />
               <span className="w-[1.5px] bg-accent/80 h-1.5 rounded animate-pulse" />
-              <span className="w-[1.5px] bg-accent/80 h-3 rounded animate-bounce" style={{ animationDuration: '0.9s' }} />
-              <span className="w-[1.5px] bg-accent/80 h-1 rounded animate-pulse" />
             </div>
-            <Volume2 className={`w-3.5 h-3.5 transition-all hidden lg:block ${isPlaying ? 'text-accent scale-110 animate-pulse' : 'text-muted'}`} />
           </div>
           
-          <div className="flex items-center gap-1 text-[10px] text-muted/50 font-mono tracking-widest select-none">
-            <span>━━━</span>
-            <span className="text-[8px] text-accent font-extrabold animate-pulse">✦ DT-STUDIO ✦</span>
-            <span>━━━</span>
+          <div className="flex items-center gap-2 px-3 py-1 bg-accent/5 rounded-full border border-accent/20 shadow-[0_0_12px_rgba(167,139,250,0.12)] transition-all">
+            <span className="relative flex h-1.5 w-1.5 shrink-0">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75 ${isPlaying ? 'block' : 'hidden'}`}></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-accent"></span>
+            </span>
+            <Music4 className={`w-3.5 h-3.5 text-accent transition-all shrink-0 ${isPlaying ? 'animate-bounce' : 'opacity-60'}`} />
+            <span className="text-[9px] text-accent font-black tracking-widest uppercase font-mono flex items-center gap-1 select-none">
+              SÓNG NHẠC Hi-Res
+            </span>
+            <Disc className={`w-3.5 h-3.5 text-accent transition-all shrink-0 ${isPlaying ? 'animate-spin' : 'opacity-60'}`} style={{ animationDuration: '3s' }} />
           </div>
 
-          <div className="flex items-center gap-1.5 text-secondary/60">
-            <Volume2 className={`w-3.5 h-3.5 transition-all hidden lg:block ${isPlaying ? 'text-accent scale-110 animate-pulse' : 'text-muted'}`} style={{ animationDelay: '0.2s' }} />
+          <div className="flex items-center gap-1 text-secondary/60">
             <div className={`flex items-center gap-0.5 h-4 px-1 ${isPlaying ? 'opacity-100' : 'opacity-30'}`}>
               <span className="w-[1.5px] bg-accent/80 h-2.5 rounded animate-bounce" style={{ animationDuration: '0.7s' }} />
               <span className="w-[1.5px] bg-accent/80 h-1 rounded animate-pulse" />
