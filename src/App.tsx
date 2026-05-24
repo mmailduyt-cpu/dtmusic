@@ -288,11 +288,7 @@ export default function App() {
   };
 
   const isTrackCORSCompatible = (source: string) => {
-    // Để tương thích tuyệt đối và loại bỏ hoàn toàn các lỗi chặn CORS từ trình duyệt khi dùng AudioContext,
-    // toàn bộ nguồn phát bên ngoài (Google Drive, Dropbox, OneDrive, R2, Direct Link...)
-    // giờ đây sẽ được định tuyến thông qua máy chủ proxy `/api/proxy?url=...` cùng miền (same-origin).
-    // Do đó, mọi nguồn nhạc đều tương thích 100% với Web Audio API và không bao giờ bị chặn CORS.
-    return true;
+    return source === 'local' || source === 'R2';
   };
 
   // Initialize the native Audio instance ONCE on mount
@@ -543,14 +539,7 @@ export default function App() {
       }
     } else {
       if (track.url) {
-        // Định tuyến tất cả các liên kết đám mây (Drive, Dropbox, OneDrive, R2 hoặc URL trực tiếp) 
-        // qua hệ thống proxy `/api/proxy?url=...` để triệt tiêu hoàn toàn sự cố chặn cors và xử lý headers tải tệp
-        const cleanUrl = track.url.trim();
-        if (cleanUrl.startsWith('http') && !cleanUrl.includes('/api/proxy')) {
-          audio.src = `/api/proxy?url=${encodeURIComponent(cleanUrl)}`;
-        } else {
-          audio.src = cleanUrl;
-        }
+        audio.src = track.url;
       } else {
         audio.src = '';
       }
@@ -1273,24 +1262,14 @@ export default function App() {
                   background: 'repeating-radial-gradient(circle, #242424, #121212 2.5px, #0f0f0f 5px, #1a1a1a 6px, #121212 7px)',
                 }}
               >
-                {/* Center Vinyl Sticker Label */}
-                <div className="w-[60px] h-[60px] md:w-[96px] md:h-[96px] rounded-full bg-secondary border border-neutral-900 flex items-center justify-center overflow-hidden relative shadow-lg shrink-0">
-                  {activeTrack?.art ? (
-                    <img
-                      src={activeTrack.art}
-                      alt={activeTrack.title}
-                      className="w-full h-full object-cover select-none"
-                      style={{ referrerPolicy: "no-referrer" }}
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-tr from-accent/20 to-accent/5 flex flex-col items-center justify-center text-accent">
-                      <Music4 className="w-5 h-5 text-accent animate-pulse" />
-                      <span className="text-[7px] font-extrabold uppercase tracking-wider text-accent/80 mt-0.5">DTMusic</span>
-                    </div>
-                  )}
+                {/* Center Vinyl Sticker Label - Only containing a clean enlarged music note icon */}
+                <div className="w-[60px] h-[60px] md:w-[96px] md:h-[96px] rounded-full bg-linear-to-tr from-[#1b192e] to-[#0a0a0f] border border-neutral-900/80 flex items-center justify-center overflow-hidden relative shadow-lg shrink-0">
+                  <div className="w-full h-full flex items-center justify-center text-accent">
+                    <Music className={`w-7 h-7 md:w-11 md:h-11 text-accent stroke-[2.5] drop-shadow-[0_0_8px_var(--accent)] ${isPlaying ? 'animate-pulse scale-105' : 'opacity-85'}`} />
+                  </div>
 
                   {/* Metal center dynamic spindle pin hole */}
-                  <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="w-4 h-4 md:w-5 md:h-5 rounded-full bg-secondary/90 border border-neutral-950 flex items-center justify-center shadow-inner">
                       <div className="w-1.5 h-1.5 md:w-2.5 md:h-2.5 rounded-full bg-black shadow-inner" />
                     </div>
@@ -1304,17 +1283,17 @@ export default function App() {
           <div className="w-full glass-card glow-border p-4 rounded-2xl flex flex-col items-center shadow-2xl space-y-3 md:space-y-4">
             
             {/* TEXT HEADLINE */}
-            <div className="text-center w-full px-1">
-              <h2 className="text-xs md:text-md font-extrabold tracking-tight text-primary truncate max-w-xs mx-auto mb-0.5">
+            <div className="text-center w-full px-2">
+              <h2 className="text-sm md:text-lg font-extrabold tracking-wide text-primary font-display truncate max-w-xs mx-auto mb-1">
                 {activeTrack ? (
                   activeTrack.title
                 ) : (
-                  <span className="text-accent text-[11px] uppercase tracking-widest font-black font-mono">
+                  <span className="text-accent text-[12px] md:text-sm uppercase tracking-widest font-black font-display bg-linear-to-r from-accent to-accent-dim bg-clip-text text-transparent">
                     DTMusic
                   </span>
                 )}
               </h2>
-              <p className="text-[9.5px] md:text-[11px] text-muted truncate max-w-xs mx-auto min-h-[14px]">
+              <p className="text-[10px] md:text-[12px] text-accent/80 font-medium font-display tracking-wider uppercase truncate max-w-xs mx-auto min-h-[16px] opacity-90">
                 {activeTrack ? activeTrack.artist : 'Thả nhạc hoặc nhập đường dẫn đám mây'}
               </p>
 
@@ -1432,16 +1411,16 @@ export default function App() {
             )}
           </div>
           <div className="min-w-0">
-            <h4 className="text-xs font-semibold text-primary truncate max-w-[130px] md:max-w-[180px]">
+            <h4 className="text-xs font-bold text-primary truncate max-w-[130px] md:max-w-[180px] font-display tracking-wide">
               {activeTrack ? (
                 activeTrack.title
               ) : (
-                <span className="text-[10px] uppercase font-black tracking-wider text-accent font-mono">
+                <span className="text-[10px] uppercase font-black tracking-wider text-accent font-display">
                   DTMusic
                 </span>
               )}
             </h4>
-            <p className="text-[10px] text-muted truncate max-w-[130px] md:max-w-[180px]">
+            <p className="text-[9px] text-muted truncate max-w-[130px] md:max-w-[180px] font-display uppercase tracking-wider">
               {activeTrack ? activeTrack.artist : 'Chưa chọn bài hát'}
             </p>
           </div>
