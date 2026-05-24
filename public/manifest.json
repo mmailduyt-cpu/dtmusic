@@ -1,0 +1,26 @@
+{
+  "name": "DTMusic — Web Music Player",
+  "short_name": "DTMusic",
+  "description": "Web player nghe nhạc từ local và cloud cá nhân chất lượng cao",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
+  "orientation": "portrait-primary",
+  "categories": ["music", "entertainment"],
+  "lang": "vi",
+  "icons": [
+    {
+      "src": "https://images.unsplash.com/photo-1614680376593-902f74fa0d41?w=192&h=192&fit=crop&q=80",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1614680376593-902f74fa0d41?w=512&h=512&fit=crop&q=80",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
+  ]
+}

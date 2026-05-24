@@ -1,0 +1,6 @@
+{
+  "name": "DTMusic",
+  "description": "Trình phát nhạc cá nhân đột phá với hệ thống EQ 5-band, Visualizer, lyric hát Karaoke, đồng bộ Cloudflare R2, Google Drive và bộ công cụ lặp lướt chuyên nghiệp.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

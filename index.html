@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="vi" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DTMusic — Web Music Player</title>
+    <meta name="description" content="Trình phát nhạc đám mây cá nhân đột phá với hệ chỉnh EQ 5-band, visualizer thông minh và lyric Karaoke hát khớp nhạc." />
+    
+    <!-- PWA Setup tags -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0a0a0f" />
+    <link rel="apple-touch-icon" href="https://images.unsplash.com/photo-1614680376593-902f74fa0d41?w=192&h=192&fit=crop&q=80" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      const isDev = window.location.hostname.includes('.run.app') || window.location.hostname === 'localhost';
+      if (isDev) {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(registrations => {
+            for (let reg of registrations) {
+              reg.unregister().then(() => {
+                console.log('🧹 Unregistered active service worker in development sandbox to unlock browser cache.');
+              });
+            }
+          });
+        }
+        if ('caches' in window) {
+          caches.keys().then(names => {
+            for (let name of names) {
+              caches.delete(name).then(() => {
+                console.log('🧹 Purged cache storage:', name);
+              });
+            }
+          });
+        }
+      } else if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('DTMusic ServiceWorker registered successfully.'))
+            .catch(err => console.warn('ServiceWorker registration error:', err));
+        });
+      }
+    </script>
+  </body>
+</html>
+
