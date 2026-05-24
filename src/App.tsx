@@ -28,6 +28,7 @@ export default function App() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(-1);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(70);
@@ -519,15 +520,14 @@ export default function App() {
     } else {
       audioRef.current.crossOrigin = 'anonymous';
       if (track.url) {
-        if (track.url.startsWith('http://') || track.url.startsWith('https://')) {
-          audioRef.current.src = `/api/proxy?url=${encodeURIComponent(track.url)}`;
-        } else {
-          audioRef.current.src = track.url;
-        }
+        audioRef.current.src = track.url;
       } else {
         audioRef.current.src = '';
       }
     }
+
+    // Auto-close sidebar drawer on mobile for smooth view transition
+    setShowSidebar(false);
 
     try {
       // Lazy start nodes
@@ -913,8 +913,16 @@ export default function App() {
   };
 
   return (
-    <div id="app" className="grid grid-cols-1 md:grid-cols-[300px_1fr] grid-rows-[1fr_88px] h-screen w-full bg-primary text-primary overflow-hidden font-sans select-none">
+    <div id="app" className="relative flex flex-col md:grid md:grid-cols-[300px_1fr] md:grid-rows-[1fr_68px] h-screen w-full bg-primary text-primary overflow-hidden font-sans select-none">
       
+      {/* Mobile background backdrop overlay for sliding sidebar */}
+      {showSidebar && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity"
+          onClick={() => setShowSidebar(false)}
+        />
+      )}
+
       {/* ══ SIDEBAR LEFT PANEL ══ */}
       <Sidebar
         tracks={tracks}
@@ -926,10 +934,23 @@ export default function App() {
         onR2BulkAdd={handleR2BulkAdd}
         onRelinkLocalFile={handleRelinkLocalFile}
         onTrackUpdate={handleTrackUpdate}
+        isOpen={showSidebar}
+        onClose={() => setShowSidebar(false)}
       />
 
       {/* ══ MAIN WORKSPACE ══ */}
-      <main id="main" className="relative flex flex-col justify-center items-center bg-primary overflow-hidden md:border-l border-border px-4 py-6 md:p-10 w-full h-full">
+      <main id="main" className="relative flex flex-col justify-center items-center bg-primary overflow-hidden md:border-l border-border px-4 py-4 md:p-8 w-full h-full">
+        
+        {/* Mobile menu floating toggle button on the top-left */}
+        <div className="md:hidden absolute top-4 left-4 z-40">
+          <button
+            onClick={() => setShowSidebar(!showSidebar)}
+            className="w-10 h-10 rounded-full bg-secondary/85 hover:bg-accent/25 border border-border/80 text-accent flex items-center justify-center shadow-lg backdrop-blur-xl transition-all duration-200 active:scale-95 cursor-pointer"
+            title="Thư viện nhạc"
+          >
+            <SlidersHorizontal className="w-5 h-5 rotate-90 text-accent" />
+          </button>
+        </div>
         
         {/* Dynamic customized aesthetic background (Lofi Chill/Vapor) */}
         {bgType !== 'none' && bgValue && (
@@ -1184,16 +1205,16 @@ export default function App() {
         <Visualizer analyser={analyserRef.current} isPlaying={isPlaying} />
 
         {/* Disc Rotate vinyl container centering */}
-        <div className="relative z-10 flex flex-col items-center max-w-sm w-full h-full justify-between py-4 md:py-6">
+        <div className="relative z-10 flex flex-col items-center max-w-sm w-full h-full justify-center md:justify-between py-2 md:py-6 gap-3 md:gap-4">
           
           {/* Centered Vinyl disc block with Aura radial backdrop */}
-          <div className="flex-1 flex items-center justify-center w-full min-h-[220px]">
+          <div className="flex-1 flex items-center justify-center w-full min-h-[160px] md:min-h-[220px]">
             <div className="relative group cursor-pointer" onClick={togglePlay}>
               
               {/* Back glowing aura shadow linked to active track */}
               <div
-                className={`absolute inset-[-20px] rounded-full blur-[28px] transition-all duration-[1200ms] ${
-                  isPlaying ? 'opacity-80 scale-105' : 'opacity-[0.15] scale-95'
+                className={`absolute inset-[-12px] md:inset-[-20px] rounded-full blur-[24px] md:blur-[28px] transition-all duration-[1200ms] ${
+                  isPlaying ? 'opacity-80 scale-105' : 'opacity-[0.14] scale-95'
                 }`}
                 style={{
                   background: `radial-gradient(circle, var(--accent) 0%, transparent 70%)`
@@ -1201,12 +1222,12 @@ export default function App() {
               />
               
               {/* Double Vinyl groove orbit circles */}
-              <div className="absolute inset-[-10px] border border-accent/15 rounded-full pointer-events-none z-0 animate-pulse" />
-              <div className="absolute inset-[-20px] border border-accent/5 rounded-full pointer-events-none z-0" style={{ animationDelay: '0.8s' }} />
+              <div className="absolute inset-[-8px] md:inset-[-10px] border border-accent/15 rounded-full pointer-events-none z-0 animate-pulse" />
+              <div className="absolute inset-[-15px] md:inset-[-20px] border border-accent/5 rounded-full pointer-events-none z-0" style={{ animationDelay: '0.8s' }} />
 
               {/* Carbon Plate design core with Vinyl concentric grooves */}
               <div
-                className={`w-[200px] h-[200px] md:w-[220px] md:h-[220px] relative rounded-full bg-neutral-950 flex items-center justify-center shadow-[0_15px_50px_rgba(0,0,0,0.85)] border-4 border-neutral-900/60 z-10 overflow-hidden ${
+                className={`w-[150px] h-[150px] md:w-[220px] md:h-[220px] relative rounded-full bg-neutral-950 flex items-center justify-center shadow-[0_12px_40px_rgba(0,0,0,0.85)] border-4 border-neutral-900/60 z-10 overflow-hidden ${
                   isPlaying ? 'animate-spin' : 'paused-spin'
                 }`}
                 style={{
@@ -1214,7 +1235,7 @@ export default function App() {
                 }}
               >
                 {/* Center Vinyl Sticker Label */}
-                <div className="w-[86px] h-[86px] md:w-[96px] md:h-[96px] rounded-full bg-secondary border border-neutral-900 flex items-center justify-center overflow-hidden relative shadow-lg shrink-0">
+                <div className="w-[60px] h-[60px] md:w-[96px] md:h-[96px] rounded-full bg-secondary border border-neutral-900 flex items-center justify-center overflow-hidden relative shadow-lg shrink-0">
                   {activeTrack?.art ? (
                     <img
                       src={activeTrack.art}
@@ -1224,15 +1245,15 @@ export default function App() {
                     />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-tr from-accent/20 to-accent/5 flex flex-col items-center justify-center text-accent">
-                      <Music4 className="w-6 h-6 text-accent animate-pulse" />
-                      <span className="text-[7.5px] font-extrabold uppercase tracking-wider text-accent/80 mt-1">DTMusic</span>
+                      <Music4 className="w-5 h-5 text-accent animate-pulse" />
+                      <span className="text-[7px] font-extrabold uppercase tracking-wider text-accent/80 mt-0.5">DTMusic</span>
                     </div>
                   )}
 
                   {/* Metal center dynamic spindle pin hole */}
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-5 h-5 rounded-full bg-secondary/90 border-2 border-neutral-950 flex items-center justify-center shadow-inner">
-                      <div className="w-2.5 h-2.5 rounded-full bg-black shadow-inner" />
+                    <div className="w-4 h-4 md:w-5 md:h-5 rounded-full bg-secondary/90 border border-neutral-950 flex items-center justify-center shadow-inner">
+                      <div className="w-1.5 h-1.5 md:w-2.5 md:h-2.5 rounded-full bg-black shadow-inner" />
                     </div>
                   </div>
                 </div>
@@ -1241,22 +1262,22 @@ export default function App() {
           </div>
 
           {/* ACTIVE SONG INFO & CONTROLLER BOX (The Bento Hub) */}
-          <div className="w-full glass-card glow-border p-4.5 rounded-2xl flex flex-col items-center shadow-2xl space-y-1.5">
+          <div className="w-full glass-card glow-border p-4 rounded-2xl flex flex-col items-center shadow-2xl space-y-3 md:space-y-4">
             
             {/* TEXT HEADLINE */}
-            <div className="text-center w-full px-2">
-              <h2 className="text-sm md:text-md font-extrabold tracking-tight text-primary truncate max-w-xs mx-auto mb-0.5">
+            <div className="text-center w-full px-1">
+              <h2 className="text-xs md:text-md font-extrabold tracking-tight text-primary truncate max-w-xs mx-auto mb-0.5">
                 {activeTrack ? activeTrack.title : 'DTMusic Player'}
               </h2>
-              <p className="text-[10px] md:text-[11px] text-muted truncate max-w-xs mx-auto min-h-[14px]">
-                {activeTrack ? activeTrack.artist : 'Thả nhạc hoặc nhập đường dẫn để thưởng thức'}
+              <p className="text-[9.5px] md:text-[11px] text-muted truncate max-w-xs mx-auto min-h-[14px]">
+                {activeTrack ? activeTrack.artist : 'Thả nhạc hoặc nhập đường dẫn đám mây'}
               </p>
 
               {/* Badges list */}
-              <div className="flex items-center justify-center gap-2 mt-3">
+              <div className="flex items-center justify-center gap-2 mt-2">
                 <button
                   onClick={() => setShowEQ((prev) => !prev)}
-                  className={`text-[9px] font-bold px-3 py-1 rounded-full transition-all cursor-pointer flex items-center gap-1 border border-border ${
+                  className={`text-[8.5px] md:text-[9px] font-bold px-2.5 py-0.5 rounded-full transition-all cursor-pointer flex items-center gap-1 border border-border ${
                     showEQ ? 'bg-accent/20 border-accent text-accent font-extrabold shadow-sm' : 'text-secondary hover:text-primary hover:bg-hover'
                   }`}
                 >
@@ -1265,12 +1286,87 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => setShowLyrics(true)}
-                  className="text-[9px] font-bold px-3 py-1 rounded-full text-secondary hover:text-primary hover:bg-hover border border-border/80 cursor-pointer flex items-center gap-1"
+                  className="text-[8.5px] md:text-[9px] font-bold px-2.5 py-0.5 rounded-full text-secondary hover:text-primary hover:bg-hover border border-border/80 cursor-pointer flex items-center gap-1"
                 >
                   <span>🎵</span>
                   <span>Lời hát</span>
                 </button>
               </div>
+            </div>
+
+            {/* PROGRESS BAR TIMELINE */}
+            <div className="w-full px-1 space-y-1">
+              <input
+                type="range"
+                min="0"
+                max={duration || 100}
+                value={currentTime}
+                onChange={(e) => seekTime(parseFloat(e.target.value))}
+                disabled={tracks.length === 0}
+                className="w-full h-1 bg-primary/40 border-transparent rounded-lg appearance-none cursor-pointer accent-accent slider-custom"
+                style={{
+                  background: `linear-gradient(to right, var(--accent) ${
+                    duration ? (currentTime / duration) * 100 : 0
+                  }%, var(--bg-tertiary) ${duration ? (currentTime / duration) * 100 : 0}%)`,
+                }}
+              />
+              <div className="flex justify-between items-center text-[8.5px] text-muted font-bold font-mono px-0.5">
+                <span>{formatTimeStr(currentTime)}</span>
+                <span>{formatTimeStr(duration)}</span>
+              </div>
+            </div>
+
+            {/* ACTION MUSIC BUTTONS CONTROLLERS */}
+            <div className="flex items-center gap-3.5 md:gap-4.5 justify-center w-full">
+              {/* Shuffle button */}
+              <button
+                onClick={() => setIsShuffle((prev) => !prev)}
+                className={`p-1 hover:text-accent transition-colors cursor-pointer ${
+                  isShuffle ? 'text-accent drop-shadow-[0_0_4px_rgba(167,139,250,0.6)]' : 'text-muted hover:text-primary'
+                }`}
+                title="Phát ngẫu nhiên"
+              >
+                <Shuffle className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Prev button */}
+              <button onClick={skipPrev} className="p-1 text-secondary hover:text-primary transition-colors cursor-pointer" title="Bài trước">
+                <SkipBack className="w-4 h-4 fill-current" />
+              </button>
+
+              {/* Main Play/Pause Button */}
+              <button
+                onClick={togglePlay}
+                className="w-10 h-10 md:w-11 md:h-11 rounded-full bg-accent hover:scale-105 active:scale-95 text-white flex items-center justify-center cursor-pointer transition-all shadow-[0_4px_15px_rgba(168,85,247,0.35)]"
+                title="Phát/Tạm dừng (Phím Cách)"
+              >
+                {isPlaying ? (
+                  <Pause className="w-4 h-4 fill-current" />
+                ) : (
+                  <Play className="w-4 h-4 fill-current ml-0.5" />
+                )}
+              </button>
+
+              {/* Next button */}
+              <button onClick={skipNext} className="p-1 text-secondary hover:text-primary transition-colors cursor-pointer" title="Bài tiếp theo">
+                <SkipForward className="w-4 h-4 fill-current" />
+              </button>
+
+              {/* Repeat button */}
+              <button
+                onClick={() => setRepeatMode((prev) => ((prev + 1) % 3) as 0 | 1 | 2)}
+                className={`p-1 hover:text-accent transition-colors cursor-pointer relative ${
+                  repeatMode > 0 ? 'text-accent' : 'text-muted hover:text-primary'
+                }`}
+                title={repeatMode === 1 ? 'Lặp lại toàn bộ' : repeatMode === 2 ? 'Lặp lại 1 bài' : 'Không lặp'}
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                {repeatMode === 2 && (
+                  <span className="absolute top-[-2px] right-[-2px] bg-accent text-[6.5px] text-white font-extrabold w-2.5 h-2.5 rounded-full flex items-center justify-center">
+                    1
+                  </span>
+                )}
+              </button>
             </div>
 
           </div>
@@ -1279,111 +1375,49 @@ export default function App() {
       </main>
 
       {/* ══ FOOTER BAR CONTROLS (Slim Modern Layout) ══ */}
-      <footer id="player-bar" className="col-span-1 md:col-span-2 bg-secondary/95 backdrop-blur-md border-t border-border flex flex-col md:flex-row items-center justify-between px-4 md:px-6 py-2.5 z-20 select-none gap-2 md:gap-4 md:h-[72px]">
+      <footer id="player-bar" className="col-span-1 md:col-span-2 bg-secondary/95 backdrop-blur-md border-t border-border flex items-center justify-between px-4 md:px-6 py-2 z-20 select-none h-[60px] md:h-[68px]">
         
-        {/* Foot Track Specs */}
-        <div className="flex items-center gap-3 w-full md:w-auto md:max-w-xs shrink-0">
-          <div className="w-[42px] h-[42px] rounded-lg bg-tertiary/60 overflow-hidden shrink-0 border border-border flex items-center justify-center p-0.5">
+        {/* Left Side: Active track metadata */}
+        <div className="flex items-center gap-3 w-full max-w-[200px] md:max-w-xs shrink-0">
+          <div className="w-[36px] h-[36px] rounded-lg bg-tertiary/60 overflow-hidden shrink-0 border border-border flex items-center justify-center p-0.5">
             {activeTrack?.art ? (
               <img src={activeTrack.art} alt={activeTrack.title} className="w-full h-full object-cover rounded" />
             ) : (
-              <Music4 className="w-4.5 h-4.5 text-muted/60 animate-pulse" />
+              <Music4 className="w-4 h-4 text-muted/60 animate-pulse" />
             )}
           </div>
-          <div className="min-w-0 flex-1 md:flex-initial">
-            <h4 className="text-xs font-semibold text-primary truncate max-w-[200px]">
+          <div className="min-w-0">
+            <h4 className="text-xs font-semibold text-primary truncate max-w-[130px] md:max-w-[180px]">
               {activeTrack ? activeTrack.title : 'DTMusic Player'}
             </h4>
-            <p className="text-[10px] text-muted truncate max-w-[200px]">
+            <p className="text-[10px] text-muted truncate max-w-[130px] md:max-w-[180px]">
               {activeTrack ? activeTrack.artist : 'Chưa chọn bài hát'}
             </p>
           </div>
         </div>
 
-        {/* Center timeline and controller on all devices with responsive touchpoints */}
-        <div className="flex flex-col items-center flex-1 w-full max-w-xl mx-0 md:mx-4 py-0.5 z-20">
-          <div className="flex items-center gap-4.5 md:gap-5 mb-1 px-4 py-0.5 rounded-full bg-tertiary/20 border border-border/10">
-            {/* Shuffle button */}
-            <button
-              onClick={() => setIsShuffle((prev) => !prev)}
-              className={`p-1 hover:text-accent transition-colors cursor-pointer ${
-                isShuffle ? 'text-accent drop-shadow-[0_0_4px_rgba(167,139,250,0.6)]' : 'text-muted'
-              }`}
-              title="Phát ngẫu nhiên"
-            >
-              <Shuffle className="w-3.5 h-3.5" />
-            </button>
-
-            {/* Prev button */}
-            <button onClick={skipPrev} className="text-secondary hover:text-primary transition-colors cursor-pointer" title="Bài trước">
-              <SkipBack className="w-3.5 h-3.5 fill-current" />
-            </button>
-
-            {/* Main Play/Pause Button */}
-            <button
-              onClick={togglePlay}
-              className="w-8 h-8 rounded-full bg-accent hover:scale-105 active:scale-95 text-white flex items-center justify-center cursor-pointer transition-all shadow-md shadow-accent/20"
-              title="Phát/Tạm dừng (Phím Cách)"
-            >
-              {isPlaying ? (
-                <Pause className="w-3.5 h-3.5 fill-current" />
-              ) : (
-                <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
-              )}
-            </button>
-
-            {/* Next button */}
-            <button onClick={skipNext} className="text-secondary hover:text-primary transition-colors cursor-pointer" title="Bài tiếp theo">
-              <SkipForward className="w-3.5 h-3.5 fill-current" />
-            </button>
-
-            {/* Repeat button */}
-            <button
-              onClick={() => setRepeatMode((prev) => ((prev + 1) % 3) as 0 | 1 | 2)}
-              className={`p-1 hover:text-accent transition-colors cursor-pointer relative ${
-                repeatMode > 0 ? 'text-accent' : 'text-muted'
-              }`}
-              title={repeatMode === 1 ? 'Lặp lại toàn bộ' : repeatMode === 2 ? 'Lặp lại 1 bài' : 'Không lặp'}
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              {repeatMode === 2 && (
-                <span className="absolute top-[-2px] right-[-2px] bg-accent text-[6.5px] text-white font-extrabold w-2.5 h-2.5 rounded-full flex items-center justify-center">
-                  1
-                </span>
-              )}
-            </button>
+        {/* Center: Subtle active wave badge instead of duplicate controllers */}
+        <div className="hidden md:flex items-center gap-2">
+          <div className={`flex items-center gap-0.5 h-3 ${isPlaying ? 'opacity-100' : 'opacity-40'}`}>
+            <span className="w-0.5 bg-accent rounded-full animate-pulse h-1" style={{ animationDelay: '0.1s' }} />
+            <span className="w-0.5 bg-accent rounded-full animate-bounce h-2.5" />
+            <span className="w-0.5 bg-accent rounded-full animate-pulse h-1.5" style={{ animationDelay: '0.3s' }} />
+            <span className="w-0.5 bg-accent rounded-full animate-bounce h-3" style={{ animationDelay: '0.2s' }} />
+            <span className="w-0.5 bg-accent rounded-full animate-pulse h-2" style={{ animationDelay: '0.4s' }} />
           </div>
-
-          <div className="w-full flex items-center gap-2">
-            <span className="text-[8.5px] font-bold text-muted font-mono w-[30px] text-right">{formatTimeStr(currentTime)}</span>
-            <input
-              type="range"
-              min="0"
-              max={duration || 100}
-              value={currentTime}
-              onChange={(e) => seekTime(parseFloat(e.target.value))}
-              disabled={tracks.length === 0}
-              className="flex-1 h-[2.5px] bg-border-hover rounded-lg accent-accent cursor-pointer slider-custom"
-              style={{
-                background: `linear-gradient(to right, var(--accent) ${
-                  duration ? (currentTime / duration) * 100 : 0
-                }%, var(--bg-tertiary) ${duration ? (currentTime / duration) * 100 : 0}%)`,
-              }}
-            />
-            <span className="text-[8.5px] font-bold text-muted font-mono w-[30px]">{formatTimeStr(duration)}</span>
-          </div>
+          <span className="text-[9px] text-secondary font-bold font-mono tracking-wider uppercase">SÓNG NHẠC CHẤT LƯỢNG CAO</span>
         </div>
 
         {/* Right Area: Spatial audio and Volume settings */}
-        <div className="flex items-center gap-4 shrink-0 w-full md:w-auto justify-between md:justify-end mt-1 md:mt-0">
+        <div className="flex items-center gap-4 shrink-0">
           {/* Dolby badge */}
-          <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded bg-accent/10 border border-accent/20">
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-accent/5 rounded border border-accent/15">
             <Sparkles className="w-3 h-3 text-accent animate-spin" style={{ animationDuration: '6s' }} />
             <span className="text-[8.5px] text-accent font-extrabold uppercase font-mono tracking-wider">Dolby HQ Audio</span>
           </div>
 
           {/* Volume Control widget */}
-          <div className="flex items-center gap-2 w-full max-w-[130px] md:max-w-[140px] shrink-0">
+          <div className="flex items-center gap-2 w-28 md:w-32 shrink-0">
             <button onClick={toggleMute} className="text-secondary hover:text-primary transition-colors cursor-pointer shrink-0">
               {isMuted ? <VolumeX className="w-3.5 h-3.5 text-rose-500" /> : <Volume2 className="w-3.5 h-3.5" />}
             </button>
@@ -1393,7 +1427,7 @@ export default function App() {
               max="100"
               value={volume}
               onChange={(e) => setVolume(parseInt(e.target.value))}
-              className="flex-1 h-[3px] bg-border-hover rounded-lg accent-accent cursor-pointer slider-custom"
+              className="flex-1 h-[2.5px] bg-border-hover rounded-lg accent-accent cursor-pointer slider-custom"
               style={{
                 background: `linear-gradient(to right, var(--accent) ${volume}%, var(--bg-tertiary) ${volume}%)`,
               }}

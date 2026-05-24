@@ -28,6 +28,8 @@ interface SidebarProps {
   onR2BulkAdd: (url: string, files: string[]) => void;
   onRelinkLocalFile: (id: string, file: File) => void;
   onTrackUpdate?: (id: string, updatedFields: Partial<Track>) => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 type TabType = 'local' | 'r2' | 'drive' | 'dropbox' | 'more';
@@ -42,6 +44,8 @@ export default function Sidebar({
   onR2BulkAdd,
   onRelinkLocalFile,
   onTrackUpdate,
+  isOpen,
+  onClose,
 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<TabType>('local');
   const [searchQuery, setSearchQuery] = useState('');
@@ -269,20 +273,39 @@ export default function Sidebar({
   });
 
   return (
-    <aside id="sidebar" className="h-full flex flex-col bg-secondary border-r border-border overflow-hidden select-none">
+    <aside
+      id="sidebar"
+      className={`h-full flex flex-col bg-secondary border-r border-border overflow-hidden select-none transition-transform duration-300 z-50
+        fixed inset-y-0 left-0 w-[290px] md:static md:w-[300px] md:translate-x-0 ${
+          isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
+        }
+      `}
+    >
       {/* Brand logo */}
-      <div className="sidebar-logo flex items-center gap-2.5 px-4.5 py-3.5 border-b border-border">
-        <div className="relative w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center text-accent border border-accent/25 overflow-hidden shadow-[0_0_10px_rgba(168,85,247,0.3)] shrink-0">
-          <Disc className="w-5 h-5 animate-spin" style={{ animationDuration: '4s' }} />
-          <Music className="w-2.5 h-2.5 text-white absolute bottom-0.5 right-0.5" />
+      <div className="sidebar-logo flex items-center justify-between px-4.5 py-3.5 border-b border-border">
+        <div className="flex items-center gap-2.5">
+          <div className="relative w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center text-accent border border-accent/25 overflow-hidden shadow-[0_0_10px_rgba(168,85,247,0.3)] shrink-0">
+            <Disc className="w-5 h-5 animate-spin" style={{ animationDuration: '4s' }} />
+            <Music className="w-2.5 h-2.5 text-white absolute bottom-0.5 right-0.5" />
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-extrabold text-primary tracking-tight uppercase flex items-center gap-1.5 leading-none">
+              DTMusic
+              <span className="text-[8px] bg-accent/20 text-accent px-1.5 py-0.5 rounded font-black uppercase tracking-wide">HQ</span>
+            </span>
+            <span className="text-[8px] text-muted font-bold tracking-widest uppercase mt-0.5">Audiophile Player</span>
+          </div>
         </div>
-        <div className="flex flex-col min-w-0">
-          <span className="text-sm font-extrabold text-primary tracking-tight uppercase flex items-center gap-1.5 leading-none">
-            DTMusic
-            <span className="text-[8px] bg-accent/20 text-accent px-1.5 py-0.5 rounded font-black uppercase tracking-wide">HQ</span>
-          </span>
-          <span className="text-[8px] text-muted font-bold tracking-widest uppercase mt-0.5">Audiophile Player</span>
-        </div>
+
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="md:hidden w-8 h-8 rounded-lg flex items-center justify-center border border-border/85 bg-primary/25 text-secondary hover:text-primary hover:bg-hover active:scale-95 transition-all cursor-pointer font-bold"
+            title="Đóng danh sách"
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       {/* Nguồn Nhạc Header Toggler */}
