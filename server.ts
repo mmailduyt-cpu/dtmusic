@@ -134,6 +134,80 @@ app.get("/api/r2-list", async (req, res) => {
   }
 });
 
+// --------------------------------------------------------------------------------
+// FUTURE CLOUD STORAGE INTEGRATIONS (Google Drive, Amazon S3, OneDrive, etc.)
+// These sections are placeholders for more advanced integrations that would
+// involve OAuth authentication, API interactions, and potentially file browsing.
+// Each service would typically require its own set of API routes (e.g., auth,
+// token refresh, file listing, content streaming).
+// --------------------------------------------------------------------------------
+
+// Example Placeholder for Google Drive Integration:
+/*
+// Google Drive OAuth Routes
+app.get("/api/drive/auth", (req, res) => {
+  // Redirect to Google's OAuth consent screen
+});
+
+app.get("/api/drive/callback", async (req, res) => {
+  // Handle OAuth callback, exchange code for tokens, store tokens securely
+});
+
+// Google Drive File Listing API Route
+app.get("/api/drive/list", async (req, res) => {
+  // Use stored tokens to interact with Google Drive API
+  // List files, filter for audio, return relevant metadata
+});
+
+// Google Drive File Streaming API Route (if direct links are not sufficient/secure)
+app.get("/api/drive/stream/:fileId", async (req, res) => {
+  // Use stored tokens to get a temporary direct link or stream file content
+  // Pipe file content to response, handling range requests
+});
+*/
+
+// Example Placeholder for Amazon S3 Integration:
+/*
+// S3 Setup: Requires AWS credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+// configured in environment variables.
+
+// S3 Bucket Listing API Route
+app.get("/api/s3/list", async (req, res) => {
+  // Use AWS SDK to list objects in a specified bucket
+  // Filter for audio files, generate pre-signed URLs for playback
+});
+
+// S3 File Streaming API Route (Optional, if pre-signed URLs are not preferred)
+app.get("/api/s3/stream/:bucketName/:key", async (req, res) => {
+  // Use AWS SDK to stream content from S3 object
+  // Handle range requests for seeking
+});
+*/
+
+// Example Placeholder for Microsoft OneDrive Integration:
+/*
+// OneDrive OAuth Routes
+app.get("/api/onedrive/auth", (req, res) => {
+  // Redirect to Microsoft's OAuth consent screen
+});
+
+app.get("/api/onedrive/callback", async (req, res) => {
+  // Handle OAuth callback, exchange code for tokens, store tokens securely
+});
+
+// OneDrive File Listing API Route
+app.get("/api/onedrive/list", async (req, res) => {
+  // Use stored tokens to interact with Microsoft Graph API
+  // List files, filter for audio, return relevant metadata
+});
+
+// OneDrive File Streaming API Route (if direct links are not sufficient/secure)
+app.get("/api/onedrive/stream/:fileId", async (req, res) => {
+  // Use stored tokens to get a temporary direct link or stream file content
+  // Pipe file content to response, handling range requests
+});
+*/
+
 // AI Lyrics generator API Route
 app.post("/api/lyrics", async (req, res) => {
   const { title, artist } = req.body;

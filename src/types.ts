@@ -17,7 +17,10 @@ export interface Track {
   album?: string;
   duration?: number;
   art?: string | null; // Cover art URL or base64 string
-  url?: string; // Audio URL (can be stream link, object URL, etc.)
+  url?: string; // Audio URL (can be stream link, object URL, or proxy URL)
+  r2BucketUrl?: string;
+  r2FileName?: string;
+  originalCloudUrl?: string; // For Drive, Dropbox, OneDrive, stores the original direct URL
   missing?: boolean;
   lyricData?: LyricData | null;
 }

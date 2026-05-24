@@ -182,6 +182,7 @@ export default function Sidebar({
     const match = driveUrl.match(/[-\w]{25,}/);
     const id = match ? match[0] : driveUrl;
     // Sử dụng docs.google.com giúp tăng tốc dòng truyền tải, tương thích cao hơn khi deploy sang máy chủ tĩnh như Vercel
+    // Pass original streamUrl, App.tsx will handle proxying
     const streamUrl = `https://docs.google.com/uc?export=download&id=${id}`;
 
     const rawTitle = driveName.trim() || `Tệp mã ${id.substring(0, 5)}`;
@@ -190,7 +191,7 @@ export default function Sidebar({
       source: 'Drive',
       title,
       artist: 'Google Drive Stream',
-      url: streamUrl,
+      url: streamUrl, // Original URL, will be proxied by App.tsx
     });
 
     setDriveUrl('');
@@ -212,7 +213,7 @@ export default function Sidebar({
       source: 'Dropbox',
       title: `Dropbox - ${cleanName}`,
       artist: 'Dropbox Stream',
-      url: directDropbox,
+      url: directDropbox, // Original URL, will be proxied by App.tsx
     });
 
     setDropboxUrl('');
@@ -227,7 +228,7 @@ export default function Sidebar({
       source: 'OneDrive',
       title,
       artist: 'OneDrive Stream',
-      url: onedriveUrl,
+      url: onedriveUrl, // Original URL, will be proxied by App.tsx
     });
 
     setOnedriveUrl('');
@@ -244,7 +245,7 @@ export default function Sidebar({
       source: 'URL',
       title,
       artist: 'Trực Tiếp',
-      url: directUrl,
+      url: directUrl, // Original URL, will be proxied by App.tsx
     });
 
     setDirectUrl('');
@@ -429,6 +430,9 @@ export default function Sidebar({
                 placeholder="https://pub-xxx.r2.dev"
                 className="w-full bg-primary/40 border border-border/70 hover:border-accent/40 focus:border-accent focus:ring-1 focus:ring-accent rounded-lg px-3 py-1.5 text-xs text-primary placeholder-muted/65 outline-none transition-all duration-200"
               />
+              <p className="text-[9px] text-muted leading-normal">
+                <b>NOTE</b>: Để kết nối với R2, bạn cần tạo một Bucket trên Cloudflare R2 và bật <b>"Public Access"</b> cho bucket đó. Liên kết Public Bucket URL sẽ có dạng <b>https://pub-xxx.r2.dev/</b>
+              </p>
             </div>
 
             {!r2ManualMode ? (
@@ -505,9 +509,9 @@ export default function Sidebar({
                 placeholder="https://drive.google.com/file/d/..."
                 className="w-full bg-primary/40 border border-border/70 hover:border-accent/40 focus:border-accent focus:ring-1 focus:ring-accent rounded-lg px-3 py-1.5 text-xs text-primary placeholder-muted/65 outline-none transition-all duration-200"
               />
-              <p className="text-[9px] text-muted leading-normal">
-                Bật chia sẻ ở chế độ <b>"Bất kỳ ai có liên kết đều xem"</b>.
-              </p>
+                <p className="text-[9px] text-muted leading-normal">
+                  <b>NOTE</b>: Bạn cần chia sẻ tệp nhạc của mình trong Google Drive với chế độ <b>"Bất kỳ ai có liên kết đều xem"</b> để ứng dụng có thể truy cập được.
+                </p>
             </div>
 
             <div className="space-y-1">
@@ -546,9 +550,9 @@ export default function Sidebar({
                 placeholder="https://www.dropbox.com/s/..."
                 className="w-full bg-primary/40 border border-border/70 hover:border-accent/40 focus:border-accent focus:ring-1 focus:ring-accent rounded-lg px-3 py-1.5 text-xs text-primary placeholder-muted/65 outline-none transition-all duration-200"
               />
-              <p className="text-[9px] text-muted leading-normal">
-                Tự chuyển đổi URL sang tệp truyền phát trực tiếp chất lượng cao.
-              </p>
+                <p className="text-[9px] text-muted leading-normal">
+                  <b>NOTE</b>: Đảm bảo rằng liên kết Dropbox của bạn là liên kết chia sẻ công khai. Ứng dụng sẽ tự động chuyển đổi nó thành liên kết truyền phát trực tiếp.
+                </p>
             </div>
 
             <button 
@@ -572,6 +576,9 @@ export default function Sidebar({
               <div className="space-y-1">
                 <label className="block text-[9px] font-bold uppercase tracking-wider text-secondary/70">
                   OneDrive Download URL
+                  <p className="text-[9px] text-muted leading-normal">
+                    <b>NOTE</b>: Bạn cần cung cấp URL tải xuống trực tiếp từ OneDrive. Để lấy URL này, hãy chia sẻ tệp, sau đó nhấp vào "Tải xuống" và sao chép địa chỉ liên kết.
+                  </p>
                 </label>
                 <input
                   type="url"
@@ -612,6 +619,9 @@ export default function Sidebar({
               <div className="space-y-1">
                 <label className="block text-[9px] font-bold uppercase tracking-wider text-secondary/70">
                   Đường dẫn tệp (MP3, FLAC, WAV)
+                  <p className="text-[9px] text-muted leading-normal">
+                    <b>NOTE</b>: Dán trực tiếp URL của tệp âm thanh (ví dụ: .mp3, .flac). Đảm bảo URL này có thể truy cập công khai và hỗ trợ phát trực tuyến.
+                  </p>
                 </label>
                 <input
                   type="url"

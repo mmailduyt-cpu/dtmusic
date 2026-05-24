@@ -288,7 +288,7 @@ export default function App() {
   };
 
   const isTrackCORSCompatible = (source: string) => {
-    return source === 'local' || source === 'R2';
+    return source === 'local' || source === 'R2' || source === 'Drive' || source === 'Dropbox' || source === 'OneDrive' || source === 'URL';
   };
 
   // Initialize the native Audio instance ONCE on mount
@@ -917,7 +917,15 @@ export default function App() {
 
   const handleCloudTrackAdd = (newTrack: Omit<Track, 'id'>) => {
     const generatedId = `cloud_${Date.now()}`;
-    const trackWithId: Track = { ...newTrack, id: generatedId };
+
+    const proxiedUrl = `/api/proxy?url=${encodeURIComponent(newTrack.url || '')}`;
+
+    const trackWithId: Track = { 
+      ...newTrack, 
+      id: generatedId, 
+      url: proxiedUrl, 
+      originalCloudUrl: newTrack.url 
+    };
     const updated = [...tracks, trackWithId];
     savePlaylist(updated);
     showToast(`✅ Đã thêm bài hát: ${newTrack.title}`);
@@ -925,34 +933,23 @@ export default function App() {
 
   const handleR2BulkAdd = (url: string, files: string[]) => {
     const items: Track[] = files.map((fileName) => {
-      // If fileName is a full URL, use it directly as the target URL!
-      if (fileName.startsWith('http://') || fileName.startsWith('https://')) {
-        const cleanTitle = fileName.split('/').pop()?.replace(/\?[^/]*$/, '').replace(/\.[^.]+$/, '') || 'R2 Song';
-        return {
-          id: `r2_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-          source: 'R2',
-          title: `R2 - ${decodeURIComponent(cleanTitle)}`,
-          artist: 'Cloudflare R2 Bucket',
-          url: fileName,
-        };
-      }
-
-      // Otherwise, construct from bucket URL and file path
-      const title = `R2 - ${fileName.replace(/\.[^.]+$/, '')}`;
-      
-      // Smart path joining and encoding spaces but keeping directory slashes intact
+      // Construct proxy URL for R2 tracks
       const cleanBase = url.replace(/\/$/, '');
       const cleanPath = fileName.split('/')
         .map(segment => encodeURIComponent(segment))
         .join('/');
-      const fullUrl = `${cleanBase}/${cleanPath}`;
+      const proxiedUrl = `/api/proxy?url=${encodeURIComponent(`${cleanBase}/${cleanPath}`)}`;
 
+      const title = `R2 - ${fileName.replace(/\.[^.]+$/, '')}`;
+      
       return {
         id: `r2_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         source: 'R2',
         title,
         artist: 'Cloudflare R2 Bucket',
-        url: fullUrl,
+        url: proxiedUrl, // This will now be the proxied URL
+        r2BucketUrl: cleanBase, // Store original R2 bucket URL
+        r2FileName: fileName, // Store original R2 file name
       };
     });
     const updated = [...tracks, ...items];
