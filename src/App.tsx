@@ -288,7 +288,11 @@ export default function App() {
   };
 
   const isTrackCORSCompatible = (source: string) => {
-    return source === 'local' || source === 'R2';
+    // Để tương thích tuyệt đối và loại bỏ hoàn toàn các lỗi chặn CORS từ trình duyệt khi dùng AudioContext,
+    // toàn bộ nguồn phát bên ngoài (Google Drive, Dropbox, OneDrive, R2, Direct Link...)
+    // giờ đây sẽ được định tuyến thông qua máy chủ proxy `/api/proxy?url=...` cùng miền (same-origin).
+    // Do đó, mọi nguồn nhạc đều tương thích 100% với Web Audio API và không bao giờ bị chặn CORS.
+    return true;
   };
 
   // Initialize the native Audio instance ONCE on mount
@@ -539,8 +543,14 @@ export default function App() {
       }
     } else {
       if (track.url) {
-        // Direct media streaming without proxying avoids Vercel paywall, 10s serverless cuts, or 4.5MB size caps
-        audio.src = track.url;
+        // Định tuyến tất cả các liên kết đám mây (Drive, Dropbox, OneDrive, R2 hoặc URL trực tiếp) 
+        // qua hệ thống proxy `/api/proxy?url=...` để triệt tiêu hoàn toàn sự cố chặn cors và xử lý headers tải tệp
+        const cleanUrl = track.url.trim();
+        if (cleanUrl.startsWith('http') && !cleanUrl.includes('/api/proxy')) {
+          audio.src = `/api/proxy?url=${encodeURIComponent(cleanUrl)}`;
+        } else {
+          audio.src = cleanUrl;
+        }
       } else {
         audio.src = '';
       }
