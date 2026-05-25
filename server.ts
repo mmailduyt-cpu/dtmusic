@@ -4,8 +4,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import { Readable } from "stream";
-import { S3Client, ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { createHash, createHmac } from "crypto";
 
 dotenv.config();
 
@@ -140,13 +139,119 @@ app.get("/api/r2-list", async (req, res) => {
   }
 });
 
-function createS3Client(endpoint: string, region: string, accessKeyId: string, secretAccessKey: string) {
-  return new S3Client({
-    region: region || "auto",
-    endpoint,
-    credentials: { accessKeyId, secretAccessKey },
-    forcePathStyle: true,
+// ─── Lightweight S3 Client (AWS Signature V4) ───
+// Uses only Node.js built-in crypto + fetch, no external SDK needed.
+function sha256(data: string): string {
+  return createHash('sha256').update(data, 'utf8').digest('hex');
+}
+
+function hmacSha256(key: Buffer | string, data: string): Buffer {
+  return createHmac('sha256', key).update(data, 'utf8').digest();
+}
+
+function getSignatureKey(secret: string, dateStamp: string, region: string, service: string): Buffer {
+  const kDate = hmacSha256(`AWS4${secret}`, dateStamp);
+  const kRegion = hmacSha256(kDate, region);
+  const kService = hmacSha256(kRegion, service);
+  return hmacSha256(kService, 'aws4_request');
+}
+
+function s3SignRequest(
+  method: string,
+  endpoint: string,
+  path: string,
+  queryString: string,
+  headers: Record<string, string>,
+  body: string,
+  accessKeyId: string,
+  secretAccessKey: string,
+  region: string,
+): Record<string, string> {
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:\-]|\.\d{3}/g, '');
+  const dateStamp = amzDate.slice(0, 8);
+  const service = 's3';
+
+  const allHeaders: Record<string, string> = { ...headers, 'x-amz-date': amzDate, host: new URL(endpoint).hostname };
+  const sortedKeys = Object.keys(allHeaders).map(k => k.toLowerCase()).sort();
+  const signedHeaders = sortedKeys.join(';');
+  const canonicalHeaders = sortedKeys.map(k => `${k}:${allHeaders[k]?.trim() || ''}\n`).join('');
+  const payloadHash = body ? sha256(body) : sha256('');
+  const canonicalRequest = [method, path, queryString, canonicalHeaders, signedHeaders, payloadHash].join('\n');
+
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, credentialScope, sha256(canonicalRequest)].join('\n');
+  const signingKey = getSignatureKey(secretAccessKey, dateStamp, region, service);
+  const signature = hmacSha256(signingKey, stringToSign).toString('hex');
+  const authorization = `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+  return { ...allHeaders, Authorization: authorization, 'x-amz-content-sha256': payloadHash };
+}
+
+function s3PresignUrl(
+  endpoint: string,
+  bucket: string,
+  key: string,
+  accessKeyId: string,
+  secretAccessKey: string,
+  region: string,
+  expiresIn = 3600,
+): string {
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:\-]|\.\d{3}/g, '');
+  const dateStamp = amzDate.slice(0, 8);
+  const service = 's3';
+
+  const host = new URL(endpoint).hostname;
+  const path = `/${bucket}/${encodeURI(key)}`;
+  const signedHeaders = 'host';
+
+  const params = new URLSearchParams({
+    'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+    'X-Amz-Credential': `${accessKeyId}/${dateStamp}/${region}/${service}/aws4_request`,
+    'X-Amz-Date': amzDate,
+    'X-Amz-Expires': String(expiresIn),
+    'X-Amz-SignedHeaders': signedHeaders,
   });
+
+  const canonicalQuery = params.toString().replace(/\+/g, '%20');
+  const canonicalHeaders = `host:${host}\n`;
+  const canonicalRequest = ['GET', path, canonicalQuery, canonicalHeaders, signedHeaders, 'UNSIGNED-PAYLOAD'].join('\n');
+
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, credentialScope, sha256(canonicalRequest)].join('\n');
+  const signingKey = getSignatureKey(secretAccessKey, dateStamp, region, service);
+  const signature = hmacSha256(signingKey, stringToSign).toString('hex');
+
+  const baseUrl = endpoint.replace(/\/$/, '');
+  return `${baseUrl}${path}?${canonicalQuery}&X-Amz-Signature=${signature}`;
+}
+
+async function s3Request(endpoint: string, bucket: string, region: string, accessKeyId: string, secretAccessKey: string, queryString: string): Promise<string> {
+  const baseUrl = endpoint.replace(/\/$/, '');
+  const path = `/${bucket}`;
+  const url = `${baseUrl}${path}?${queryString}`;
+  const headers = s3SignRequest('GET', endpoint, path, queryString, {}, '', accessKeyId, secretAccessKey, region);
+  const res = await fetch(url, { headers, signal: AbortSignal.timeout(15000) });
+  const text = await res.text();
+  if (!res.ok) {
+    const code = text.match(/<Code>([^<]+)<\/Code>/)?.[1] || `HTTP${res.status}`;
+    const msg = text.match(/<Message>([^<]+)<\/Message>/)?.[1] || res.statusText;
+    throw new Error(`${code}: ${msg}`);
+  }
+  return text;
+}
+
+function parseS3Xml(xml: string): { key: string; size: number; lastModified: string }[] {
+  const files: { key: string; size: number; lastModified: string }[] = [];
+  const items = xml.split('<Contents>');
+  for (let i = 1; i < items.length; i++) {
+    const key = items[i].match(/<Key>([^<]*)<\/Key>/)?.[1];
+    const size = parseInt(items[i].match(/<Size>(\d+)<\/Size>/)?.[1] || '0');
+    const lastModified = items[i].match(/<LastModified>([^<]+)<\/LastModified>/)?.[1] || '';
+    if (key) files.push({ key, size, lastModified });
+  }
+  return files;
 }
 
 // S3-Compatible Storage API Routes (Cloudflare R2, AWS S3, Backblaze B2)
@@ -154,22 +259,19 @@ app.post("/api/s3/test", async (req, res) => {
   try {
     const { endpoint, bucket, region, accessKeyId, secretAccessKey } = req.body;
     if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) {
-      return res.status(400).json({ error: "Missing required S3 connection parameters." });
+      return res.status(400).json({ error: "Missing required parameters." });
     }
-
-    const s3 = createS3Client(endpoint, region, accessKeyId, secretAccessKey);
-    const command = new ListObjectsV2Command({ Bucket: bucket, MaxKeys: 1 });
-    await s3.send(command);
+    const r = region || 'auto';
+    await s3Request(endpoint, bucket, r, accessKeyId, secretAccessKey, 'list-type=2&max-keys=1');
     res.json({ success: true, message: "Kết nối thành công!" });
   } catch (err: any) {
-    console.error("S3 test error:", err.name, err.message);
-    let msg = err.message || "Kết nối thất bại";
-    if (err.name === 'CredentialsProviderError') msg = "Sai Access Key hoặc Secret Key. Vui lòng kiểm tra lại.";
-    else if (err.name === 'InvalidAccessKeyId') msg = "Access Key không hợp lệ.";
-    else if (err.name === 'SignatureDoesNotMatch') msg = "Secret Key không đúng.";
-    else if (err.name === 'NoSuchBucket') msg = "Bucket không tồn tại. Kiểm tra lại tên bucket.";
-    else if (err.name === 'AccessDenied') msg = "Token không có quyền truy cập bucket. Cần quyền Read.";
-    else if (msg.includes('Invalid URL') || msg.includes('ENOTFOUND')) msg = "Endpoint URL không đúng. Với R2 dùng: https://<account-id>.r2.cloudflarestorage.com";
+    console.error("S3 test error:", err.message);
+    let msg = err.message;
+    if (msg.includes('InvalidAccessKeyId')) msg = "Access Key không hợp lệ.";
+    else if (msg.includes('SignatureDoesNotMatch')) msg = "Secret Key không đúng.";
+    else if (msg.includes('NoSuchBucket')) msg = "Bucket không tồn tại.";
+    else if (msg.includes('AccessDenied')) msg = "Token không có quyền Read.";
+    else if (msg.includes('ENOTFOUND') || msg.includes('Invalid URL') || msg.includes('fetch failed')) msg = "Endpoint URL không đúng. Với R2 dùng: https://<account-id>.r2.cloudflarestorage.com";
     res.status(400).json({ error: msg });
   }
 });
@@ -178,43 +280,26 @@ app.post("/api/s3/list", async (req, res) => {
   try {
     const { endpoint, bucket, region, accessKeyId, secretAccessKey } = req.body;
     if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) {
-      return res.status(400).json({ error: "Missing required S3 connection parameters." });
+      return res.status(400).json({ error: "Missing required parameters." });
     }
-
-    const s3 = createS3Client(endpoint, region, accessKeyId, secretAccessKey);
-
-    const audioExtensions = new Set(['.mp3', '.flac', '.aac', '.ogg', '.wav', '.m4a', '.wma', '.opus']);
-    const allFiles: { key: string; size: number; lastModified?: string }[] = [];
-    let continuationToken: string | undefined;
+    const r = region || 'auto';
+    const audioExt = new Set(['.mp3', '.flac', '.aac', '.ogg', '.wav', '.m4a', '.wma', '.opus']);
+    let allFiles: { key: string; size: number; lastModified?: string }[] = [];
+    let token = '';
 
     do {
-      const command = new ListObjectsV2Command({
-        Bucket: bucket,
-        MaxKeys: 200,
-        ContinuationToken: continuationToken,
-      });
-      const response = await s3.send(command);
-      if (response.Contents) {
-        for (const obj of response.Contents) {
-          if (obj.Key) {
-            const ext = obj.Key.substring(obj.Key.lastIndexOf('.')).toLowerCase();
-            if (audioExtensions.has(ext)) {
-              allFiles.push({
-                key: obj.Key,
-                size: obj.Size || 0,
-                lastModified: obj.LastModified?.toISOString(),
-              });
-            }
-          }
-        }
-      }
-      continuationToken = response.NextContinuationToken;
-    } while (continuationToken);
+      const qs = `list-type=2&max-keys=200${token ? `&continuation-token=${encodeURIComponent(token)}` : ''}`;
+      const xml = await s3Request(endpoint, bucket, r, accessKeyId, secretAccessKey, qs);
+      const parsed = parseS3Xml(xml).filter(f => audioExt.has(f.key.substring(f.key.lastIndexOf('.'))));
+      allFiles = allFiles.concat(parsed);
+      const tMatch = xml.match(/<NextContinuationToken>([^<]+)<\/NextContinuationToken>/);
+      token = tMatch ? tMatch[1] : '';
+    } while (token);
 
     res.json({ files: allFiles, total: allFiles.length });
   } catch (err: any) {
-    console.error("S3 list error:", err.name, err.message);
-    res.status(400).json({ error: err.message || "Không thể quét bucket" });
+    console.error("S3 list error:", err.message);
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -224,15 +309,11 @@ app.post("/api/s3/sign", async (req, res) => {
     if (!endpoint || !bucket || !accessKeyId || !secretAccessKey || !fileKey) {
       return res.status(400).json({ error: "Missing required parameters." });
     }
-
-    const s3 = createS3Client(endpoint, region, accessKeyId, secretAccessKey);
-    const command = new GetObjectCommand({ Bucket: bucket, Key: fileKey });
-    const signedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
-
-    res.json({ url: signedUrl });
+    const url = s3PresignUrl(endpoint, bucket, fileKey, accessKeyId, secretAccessKey, region || 'auto');
+    res.json({ url });
   } catch (err: any) {
-    console.error("S3 sign error:", err.name, err.message);
-    res.status(500).json({ error: err.message || "Không thể tạo presigned URL" });
+    console.error("S3 sign error:", err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
