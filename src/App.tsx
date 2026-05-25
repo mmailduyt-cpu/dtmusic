@@ -1105,7 +1105,7 @@ export default function App() {
       const cleanPath = fileName.split('/')
         .map(segment => encodeURIComponent(segment))
         .join('/');
-      const proxiedUrl = `/api/proxy?url=${encodeURIComponent(`${cleanBase}/${cleanPath}`)}`;
+      const directUrl = `${cleanBase}/${cleanPath}`;
 
       const title = `R2 - ${fileName.replace(/\.[^.]+$/, '')}`;
       
@@ -1114,9 +1114,9 @@ export default function App() {
         source: 'R2',
         title,
         artist: 'Cloudflare R2 Bucket',
-        url: proxiedUrl, // This will now be the proxied URL
-        r2BucketUrl: cleanBase, // Store original R2 bucket URL
-        r2FileName: fileName, // Store original R2 file name
+        url: directUrl,
+        r2BucketUrl: cleanBase,
+        r2FileName: fileName,
       };
     });
     const updated = [...tracks, ...items];
