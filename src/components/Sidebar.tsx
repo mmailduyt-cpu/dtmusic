@@ -235,8 +235,9 @@ export default function Sidebar({
           secretAccessKey: s3SecretKey,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      let data;
+      try { data = await res.json(); } catch { throw new Error('Server trả về dữ liệu không hợp lệ. Kiểm tra lại server hoặc Vercel logs.'); }
+      if (!res.ok) throw new Error(data.error || 'Lỗi không xác định từ server');
       setS3Status({ type: 'ok', msg: '✅ Kết nối thành công! Bucket S3 có thể truy cập.' });
       onS3ConnectionChange?.({
         endpoint: s3Endpoint,
@@ -262,8 +263,9 @@ export default function Sidebar({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(s3Connection),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      let data;
+      try { data = await res.json(); } catch { throw new Error('Server trả về dữ liệu không hợp lệ'); }
+      if (!res.ok) throw new Error(data.error || 'Lỗi không xác định');
       if (data.files.length === 0) {
         setS3Status({ type: 'err', msg: 'Không tìm thấy file nhạc nào trong bucket' });
         return;

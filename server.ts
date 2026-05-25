@@ -140,6 +140,15 @@ app.get("/api/r2-list", async (req, res) => {
   }
 });
 
+function createS3Client(endpoint: string, region: string, accessKeyId: string, secretAccessKey: string) {
+  return new S3Client({
+    region: region || "auto",
+    endpoint,
+    credentials: { accessKeyId, secretAccessKey },
+    forcePathStyle: true,
+  });
+}
+
 // S3-Compatible Storage API Routes (Cloudflare R2, AWS S3, Backblaze B2)
 app.post("/api/s3/test", async (req, res) => {
   try {
@@ -148,18 +157,20 @@ app.post("/api/s3/test", async (req, res) => {
       return res.status(400).json({ error: "Missing required S3 connection parameters." });
     }
 
-    const s3 = new S3Client({
-      region: region || "auto",
-      endpoint,
-      credentials: { accessKeyId, secretAccessKey },
-    });
-
+    const s3 = createS3Client(endpoint, region, accessKeyId, secretAccessKey);
     const command = new ListObjectsV2Command({ Bucket: bucket, MaxKeys: 1 });
     await s3.send(command);
     res.json({ success: true, message: "Kết nối thành công!" });
   } catch (err: any) {
-    console.error("S3 test error:", err);
-    res.status(400).json({ error: err.message || "Kết nối thất bại" });
+    console.error("S3 test error:", err.name, err.message);
+    let msg = err.message || "Kết nối thất bại";
+    if (err.name === 'CredentialsProviderError') msg = "Sai Access Key hoặc Secret Key. Vui lòng kiểm tra lại.";
+    else if (err.name === 'InvalidAccessKeyId') msg = "Access Key không hợp lệ.";
+    else if (err.name === 'SignatureDoesNotMatch') msg = "Secret Key không đúng.";
+    else if (err.name === 'NoSuchBucket') msg = "Bucket không tồn tại. Kiểm tra lại tên bucket.";
+    else if (err.name === 'AccessDenied') msg = "Token không có quyền truy cập bucket. Cần quyền Read.";
+    else if (msg.includes('Invalid URL') || msg.includes('ENOTFOUND')) msg = "Endpoint URL không đúng. Với R2 dùng: https://<account-id>.r2.cloudflarestorage.com";
+    res.status(400).json({ error: msg });
   }
 });
 
@@ -170,11 +181,7 @@ app.post("/api/s3/list", async (req, res) => {
       return res.status(400).json({ error: "Missing required S3 connection parameters." });
     }
 
-    const s3 = new S3Client({
-      region: region || "auto",
-      endpoint,
-      credentials: { accessKeyId, secretAccessKey },
-    });
+    const s3 = createS3Client(endpoint, region, accessKeyId, secretAccessKey);
 
     const audioExtensions = new Set(['.mp3', '.flac', '.aac', '.ogg', '.wav', '.m4a', '.wma', '.opus']);
     const allFiles: { key: string; size: number; lastModified?: string }[] = [];
@@ -206,7 +213,7 @@ app.post("/api/s3/list", async (req, res) => {
 
     res.json({ files: allFiles, total: allFiles.length });
   } catch (err: any) {
-    console.error("S3 list error:", err);
+    console.error("S3 list error:", err.name, err.message);
     res.status(400).json({ error: err.message || "Không thể quét bucket" });
   }
 });
@@ -218,18 +225,13 @@ app.post("/api/s3/sign", async (req, res) => {
       return res.status(400).json({ error: "Missing required parameters." });
     }
 
-    const s3 = new S3Client({
-      region: region || "auto",
-      endpoint,
-      credentials: { accessKeyId, secretAccessKey },
-    });
-
+    const s3 = createS3Client(endpoint, region, accessKeyId, secretAccessKey);
     const command = new GetObjectCommand({ Bucket: bucket, Key: fileKey });
     const signedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
 
     res.json({ url: signedUrl });
   } catch (err: any) {
-    console.error("S3 sign error:", err);
+    console.error("S3 sign error:", err.name, err.message);
     res.status(500).json({ error: err.message || "Không thể tạo presigned URL" });
   }
 });
