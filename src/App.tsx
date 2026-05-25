@@ -23,7 +23,7 @@ import LyricSection from './components/LyricSection';
 import MiniPlayer from './components/MiniPlayer';
 import Visualizer from './components/Visualizer';
 
-import { Track, EQPreset, EQ_BANDS, EQ_PRESETS, LyricMode, LyricLine } from './types';
+import { Track, EQPreset, EQ_BANDS, EQ_PRESETS, LyricMode, LyricLine, S3Connection } from './types';
 
 export default function App() {
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -87,6 +87,7 @@ export default function App() {
     return saved ? parseFloat(saved) : 0.35;
   });
   const [showThemePanel, setShowThemePanel] = useState<boolean>(false);
+  const [showShortcuts, setShowShortcuts] = useState<boolean>(false);
 
   // Memory store for local File objects to stream on active session
   const [localFilesMap, setLocalFilesMap] = useState<Record<string, File>>({});
@@ -111,6 +112,58 @@ export default function App() {
 
   const prevObjectURLRef = useRef<string | null>(null);
   const bgUploadRef = useRef<HTMLInputElement>(null);
+
+  // S3 Connection State
+  const [s3Connection, setS3Connection] = useState<S3Connection | null>(() => {
+    try {
+      const saved = localStorage.getItem('dt_s3_connection');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
+  // Google Drive OAuth State
+  const [driveToken, setDriveToken] = useState<{accessToken: string; refreshToken?: string; expiresIn: number} | null>(() => {
+    try {
+      const saved = localStorage.getItem('dt_drive_token');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
+  const [driveClientId, setDriveClientId] = useState(() => localStorage.getItem('dt_drive_client_id') || '');
+  const [driveClientSecret, setDriveClientSecret] = useState(() => localStorage.getItem('dt_drive_client_secret') || '');
+
+  // Handle Google OAuth redirect callback on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const pending = sessionStorage.getItem('dt_drive_oauth_pending');
+    if (code && pending) {
+      sessionStorage.removeItem('dt_drive_oauth_pending');
+      window.history.replaceState({}, '', window.location.pathname);
+      const storedClientId = localStorage.getItem('dt_drive_client_id') || driveClientId;
+      const storedClientSecret = localStorage.getItem('dt_drive_client_secret') || driveClientSecret;
+      if (storedClientId && storedClientSecret) {
+        exchangeDriveCode(code, storedClientId, storedClientSecret);
+      }
+    }
+  }, []);
+
+  const exchangeDriveCode = async (code: string, clientId: string, clientSecret: string) => {
+    try {
+      const res = await fetch('/api/drive/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, clientId, clientSecret, redirectUri: window.location.origin }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setDriveToken(data);
+      localStorage.setItem('dt_drive_token', JSON.stringify(data));
+      showToast('✅ Đã kết nối Google Drive thành công!');
+    } catch (err: any) {
+      showToast(`❌ Lỗi kết nối Google Drive: ${err.message}`);
+    }
+  };
 
   const handleBgUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -196,6 +249,73 @@ export default function App() {
     localStorage.setItem('dt_compressor_enabled', compressorEnabled.toString());
   }, [bassBoost, vocalClarity, surround3D, compressorEnabled]);
 
+  // Persist S3 connection
+  useEffect(() => {
+    if (s3Connection) {
+      localStorage.setItem('dt_s3_connection', JSON.stringify(s3Connection));
+    } else {
+      localStorage.removeItem('dt_s3_connection');
+    }
+  }, [s3Connection]);
+
+  const handleS3ConnectionChange = (conn: S3Connection | null) => {
+    setS3Connection(conn);
+  };
+
+  // Persist Drive credentials
+  useEffect(() => {
+    if (driveToken) localStorage.setItem('dt_drive_token', JSON.stringify(driveToken));
+    else localStorage.removeItem('dt_drive_token');
+  }, [driveToken]);
+
+  useEffect(() => { localStorage.setItem('dt_drive_client_id', driveClientId); }, [driveClientId]);
+  useEffect(() => { localStorage.setItem('dt_drive_client_secret', driveClientSecret); }, [driveClientSecret]);
+
+  const handleDriveDisconnect = () => {
+    setDriveToken(null);
+    localStorage.removeItem('dt_drive_token');
+    showToast('🔌 Đã ngắt kết nối Google Drive');
+  };
+
+  const refreshDriveToken = async () => {
+    if (!driveToken?.refreshToken || !driveClientId || !driveClientSecret) return false;
+    try {
+      const res = await fetch('/api/drive/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: driveToken.refreshToken, clientId: driveClientId, clientSecret: driveClientSecret }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      const updated = { ...driveToken, accessToken: data.access_token, expiresIn: data.expires_in };
+      setDriveToken(updated);
+      localStorage.setItem('dt_drive_token', JSON.stringify(updated));
+      return true;
+    } catch (err) {
+      console.error('Failed to refresh Drive token:', err);
+      return false;
+    }
+  };
+
+  const getDriveStreamUrl = async (webContentLink: string): Promise<string | null> => {
+    if (!driveToken?.accessToken) return null;
+    return `/api/proxy?url=${encodeURIComponent(webContentLink)}&access_token=${driveToken.accessToken}`;
+  };
+
+  const handleDriveBulkAdd = (files: { id: string; title: string; webContentLink: string }[]) => {
+    const items: Track[] = files.map((f) => ({
+      id: `drive_${f.id}_${Date.now()}`,
+      source: 'Drive' as const,
+      title: f.title.replace(/\.[^.]+$/, ''),
+      artist: 'Google Drive',
+      url: '',
+      originalCloudUrl: f.webContentLink,
+    }));
+    const updated = [...tracks, ...items];
+    savePlaylist(updated);
+    showToast(`✅ Đã thêm ${items.length} bài hát từ Google Drive`);
+  };
+
   // Restore Theme & Storage Playlist on mount
   useEffect(() => {
     // Theme configuration
@@ -230,7 +350,7 @@ export default function App() {
   const savePlaylist = (updated: Track[]) => {
     setTracks(updated);
     // Strip file streams or lost object values before serializing
-    const serializable = updated.map(({ id, source, title, artist, album, duration, art, url, missing, lyricData }) => ({
+    const serializable = updated.map(({ id, source, title, artist, album, duration, art, url, missing, fileKey, originalCloudUrl, r2BucketUrl, r2FileName, lyricData }) => ({
       id,
       source,
       title,
@@ -240,6 +360,10 @@ export default function App() {
       art,
       url,
       missing,
+      fileKey,
+      originalCloudUrl,
+      r2BucketUrl,
+      r2FileName,
       lyricData,
     }));
     localStorage.setItem('snhac_playlist', JSON.stringify(serializable));
@@ -288,7 +412,7 @@ export default function App() {
   };
 
   const isTrackCORSCompatible = (source: string) => {
-    return source === 'local' || source === 'R2' || source === 'Drive' || source === 'Dropbox' || source === 'OneDrive';
+    return source === 'local' || source === 'S3' || source === 'R2' || source === 'Drive' || source === 'Dropbox' || source === 'OneDrive';
   };
 
   // Initialize the native Audio instance ONCE on mount
@@ -569,6 +693,49 @@ export default function App() {
         audio.src = objURL;
       } else {
         showToast('⚠️ Bài hát local bị thiếu tệp tin. Vui lòng nhấp "Cần chọn lại tệp" để tải lại.');
+        setIsPlaying(false);
+        return;
+      }
+    } else if (track.source === 'S3') {
+      try {
+        if (s3Connection) {
+          const signRes = await fetch('/api/s3/sign', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...s3Connection, fileKey: track.fileKey }),
+          });
+          if (!signRes.ok) {
+            const errData = await signRes.json();
+            throw new Error(errData.error || 'Không thể lấy presigned URL');
+          }
+          const { url } = await signRes.json();
+          audio.src = url;
+        } else {
+          showToast('⚠️ Chưa có cấu hình kết nối S3. Vui lòng kết nối lại.');
+          setIsPlaying(false);
+          return;
+        }
+      } catch (err: any) {
+        showToast(`❌ Lỗi phát S3: ${err.message}`);
+        setIsPlaying(false);
+        return;
+      }
+    } else if (track.source === 'Drive' && track.originalCloudUrl) {
+      try {
+        let url = await getDriveStreamUrl(track.originalCloudUrl);
+        if (!url && driveToken?.refreshToken) {
+          const refreshed = await refreshDriveToken();
+          if (refreshed) url = await getDriveStreamUrl(track.originalCloudUrl);
+        }
+        if (url) {
+          audio.src = url;
+        } else {
+          showToast('⚠️ Google Drive chưa được kết nối. Vui lòng kết nối lại.');
+          setIsPlaying(false);
+          return;
+        }
+      } catch (err: any) {
+        showToast(`❌ Lỗi phát Drive: ${err.message}`);
         setIsPlaying(false);
         return;
       }
@@ -957,6 +1124,23 @@ export default function App() {
     showToast(`✅ Đã đồng bộ thêm ${items.length} bài hát từ R2`);
   };
 
+  const handleS3BulkAdd = (files: { key: string; size: number }[]) => {
+    const items: Track[] = files.map((f) => {
+      const title = f.key.split('/').pop()?.replace(/\.[^.]+$/, '') || f.key;
+      return {
+        id: `s3_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        source: 'S3' as const,
+        title,
+        artist: 'S3 Cloud Storage',
+        fileKey: f.key,
+        url: '',
+      };
+    });
+    const updated = [...tracks, ...items];
+    savePlaylist(updated);
+    showToast(`✅ Đã thêm ${items.length} bài hát từ S3`);
+  };
+
   const handleTrackUpdate = (id: string, updatedFields: Partial<Track>) => {
     const updated = tracks.map((t) => (t.id === id ? { ...t, ...updatedFields } : t));
     savePlaylist(updated);
@@ -972,6 +1156,16 @@ export default function App() {
       setIsPlaying(false);
       setCurrentTrackIndex(-1);
     }
+  };
+
+  const handleClearAll = () => {
+    if (tracks.length === 0) return;
+    audioRef.current?.pause();
+    setIsPlaying(false);
+    setCurrentTrackIndex(-1);
+    setTracks([]);
+    localStorage.setItem('snhac_playlist', '[]');
+    showToast('🗑️ Đã xóa tất cả bài hát');
   };
 
   const toggleTheme = () => {
@@ -1015,6 +1209,17 @@ export default function App() {
         onTrackUpdate={handleTrackUpdate}
         isOpen={showSidebar}
         onClose={() => setShowSidebar(false)}
+        s3Connection={s3Connection}
+        onS3ConnectionChange={handleS3ConnectionChange}
+        onS3BulkAdd={handleS3BulkAdd}
+        driveClientId={driveClientId}
+        driveClientSecret={driveClientSecret}
+        onDriveClientIdChange={setDriveClientId}
+        onDriveClientSecretChange={setDriveClientSecret}
+        driveToken={driveToken}
+        onDriveDisconnect={handleDriveDisconnect}
+        onDriveBulkAdd={handleDriveBulkAdd}
+        onClearAll={handleClearAll}
       />
 
       {/* ══ MAIN WORKSPACE ══ */}
@@ -1061,14 +1266,23 @@ export default function App() {
 
         {/* 🎨 PREMIUM DYNAMIC CUSTOMIZER FLUID BUTTON & POPOVER PANEL */}
         <div className="absolute top-4 right-4 z-40">
-          <div className="relative flex flex-col items-end">
-            <button
-              onClick={() => setShowThemePanel(!showThemePanel)}
-              className="w-10 h-10 rounded-full bg-secondary/85 hover:bg-accent/20 border border-border/80 text-accent hover:text-accent-glow flex items-center justify-center shadow-[0_4px_15px_rgba(0,0,0,0.3)] backdrop-blur-xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
-              title="Đổi chủ đề & nghệ thuật hình nền Lofi"
-            >
-              <Sparkles className="w-5 h-5 animate-pulse" />
-            </button>
+          <div className="relative flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowShortcuts(!showShortcuts)}
+                className="w-8 h-8 rounded-full bg-secondary/85 hover:bg-accent/20 border border-border/80 text-secondary hover:text-accent flex items-center justify-center backdrop-blur-xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
+                title="Phím tắt"
+              >
+                <span className="text-xs font-black">⌨</span>
+              </button>
+              <button
+                onClick={() => setShowThemePanel(!showThemePanel)}
+                className="w-10 h-10 rounded-full bg-secondary/85 hover:bg-accent/20 border border-border/80 text-accent hover:text-accent-glow flex items-center justify-center shadow-[0_4px_15px rgba(0,0,0,0.3)] backdrop-blur-xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
+                title="Đổi chủ đề & nghệ thuật hình nền Lofi"
+              >
+                <Sparkles className="w-5 h-5 animate-pulse" />
+              </button>
+            </div>
 
             {showThemePanel && (
               <div className="fixed md:absolute top-16 right-4 left-4 md:left-auto md:top-12 md:right-0 w-auto md:w-72 bg-secondary/95 backdrop-blur-3xl border border-border/90 p-4 rounded-2xl shadow-2xl space-y-4 animate-in fade-in slide-in-from-top-3 duration-200 text-left">
@@ -1246,6 +1460,33 @@ export default function App() {
               </div>
             </div>
           )}
+
+          {showShortcuts && (
+            <div className="w-auto md:w-64 bg-secondary/95 backdrop-blur-3xl border border-border/90 p-3 rounded-2xl shadow-2xl animate-in fade-in slide-in-from-top-3 duration-200">
+              <div className="flex items-center justify-between border-b border-border/60 pb-1.5 mb-2">
+                <span className="text-[10px] font-black uppercase text-primary tracking-wider flex items-center gap-1">
+                  <span>⌨</span> Phím tắt
+                </span>
+                <button onClick={() => setShowShortcuts(false)} className="text-muted hover:text-primary text-xs cursor-pointer">✕</button>
+              </div>
+              <div className="space-y-1">
+                {[
+                  ['Space', 'Play / Tạm dừng'],
+                  ['→ / ←', 'Tua 10s'],
+                  ['N', 'Bài tiếp theo'],
+                  ['P', 'Bài trước'],
+                  ['M', 'Tắt / Bật âm'],
+                  ['L', 'Lời bài hát'],
+                ].map(([key, desc]) => (
+                  <div key={key} className="flex items-center justify-between text-[9.5px]">
+                    <kbd className="px-1.5 py-0.5 rounded bg-primary/60 text-accent font-mono font-bold text-[8.5px] border border-border/50">{key}</kbd>
+                    <span className="text-secondary font-medium">{desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           </div>
         </div>
 

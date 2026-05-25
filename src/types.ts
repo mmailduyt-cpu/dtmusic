@@ -11,7 +11,7 @@ export interface LyricData {
 
 export interface Track {
   id: string;
-  source: 'local' | 'R2' | 'Drive' | 'Dropbox' | 'OneDrive' | 'URL';
+  source: 'local' | 'S3' | 'R2' | 'Drive' | 'Dropbox' | 'OneDrive' | 'URL';
   title: string;
   artist: string;
   album?: string;
@@ -21,8 +21,17 @@ export interface Track {
   r2BucketUrl?: string;
   r2FileName?: string;
   originalCloudUrl?: string; // For Drive, Dropbox, OneDrive, stores the original direct URL
+  fileKey?: string; // For S3-compatible storage, the object key
   missing?: boolean;
   lyricData?: LyricData | null;
+}
+
+export interface S3Connection {
+  endpoint: string;
+  bucket: string;
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
 }
 
 export interface CloudConfig {
