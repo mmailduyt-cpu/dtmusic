@@ -288,7 +288,7 @@ export default function App() {
   };
 
   const isTrackCORSCompatible = (source: string) => {
-    return source === 'local' || source === 'R2' || source === 'Drive' || source === 'Dropbox' || source === 'OneDrive' || source === 'URL';
+    return source === 'local' || source === 'R2' || source === 'Drive' || source === 'Dropbox' || source === 'OneDrive';
   };
 
   // Initialize the native Audio instance ONCE on mount
@@ -362,9 +362,9 @@ export default function App() {
 
         if (audioObj.src && audioObj.src !== window.location.href) {
           showToast('❌ Lỗi liên kết: Link nhạc không phản hồi hoặc đã thay đổi mã bảo mật.');
+          }
         }
-      }
-      setIsPlaying(false);
+        setIsPlaying(false);
     };
 
     audio.addEventListener('timeupdate', onTimeUpdate);

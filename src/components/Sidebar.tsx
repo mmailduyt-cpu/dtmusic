@@ -113,42 +113,43 @@ export default function Sidebar({
   };
 
   // Connect cloud functions
-  const handleConnectR2 = async () => {
-    if (!r2Url.trim()) {
-      setR2Status({ type: 'err', msg: 'Vui lòng cung cấp Public Bucket URL' });
-      return;
-    }
-
-    setR2Status({ type: 'loading', msg: 'Đang kết nối...' });
-    localStorage.setItem('snhac_r2_url', r2Url.trim());
-
-    try {
-      const proxyListUrl = `/api/r2-list?url=${encodeURIComponent(r2Url.trim())}`;
-      const res = await fetch(proxyListUrl);
-      if (!res.ok) {
-        throw new Error('Không thể kết nối tải dữ liệu từ bucket của bạn qua máy chủ.');
-      }
-      const text = await res.text();
-      const parser = new DOMParser();
-      const xml = parser.parseFromString(text, 'text/xml');
-      const keys = Array.from(xml.querySelectorAll('Key')).map((k) => k.textContent || '');
-      const audioFiles = keys.filter((f) => /\.(mp3|flac|aac|ogg|wav|m4a)$/i.test(f));
-
-      if (audioFiles.length === 0) {
-        setR2Status({ type: 'err', msg: 'Không tìm thấy file nhạc phù hợp trong bucket (MP3, FLAC, AAC, WAV...)' });
+    const handleConnectR2 = async () => {
+      const trimmedR2Url = r2Url.trim();
+      if (!trimmedR2Url) {
+        setR2Status({ type: 'err', msg: 'Vui lòng cung cấp Public Bucket URL' });
         return;
       }
 
-      onR2BulkAdd(r2Url.trim(), audioFiles);
-      setR2Status({ type: 'ok', msg: `✅ Đã thêm ${audioFiles.length} bài hát từ R2` });
-    } catch (err: any) {
-      console.error(err);
-      setR2Status({
-        type: 'err',
-        msg: `Lỗi kết nối: ${err.message || 'Hãy kiểm tra liên kết của bạn đã có quyền truy cập công khai.'}`,
-      });
-    }
-  };
+      setR2Status({ type: 'loading', msg: 'Đang kết nối...' });
+      localStorage.setItem('snhac_r2_url', trimmedR2Url);
+
+      try {
+        const proxyListUrl = `/api/r2-list?url=${encodeURIComponent(trimmedR2Url)}`;
+        const res = await fetch(proxyListUrl);
+        if (!res.ok) {
+          throw new Error('Không thể kết nối tải dữ liệu từ bucket của bạn qua máy chủ.');
+        }
+        const text = await res.text();
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(text, 'text/xml');
+        const keys = Array.from(xml.querySelectorAll('Key')).map((k) => k.textContent || '');
+        const audioFiles = keys.filter((f) => /\.(mp3|flac|aac|ogg|wav|m4a)$/i.test(f));
+
+        if (audioFiles.length === 0) {
+          setR2Status({ type: 'err', msg: 'Không tìm thấy file nhạc phù hợp trong bucket (MP3, FLAC, AAC, WAV...)' });
+          return;
+        }
+
+        onR2BulkAdd(trimmedR2Url, audioFiles);
+        setR2Status({ type: 'ok', msg: `✅ Đã thêm ${audioFiles.length} bài hát từ R2` });
+      } catch (err: any) {
+        console.error(err);
+        setR2Status({
+          type: 'err',
+          msg: `Lỗi kết nối: ${err.message || 'Hãy kiểm tra liên kết của bạn đã có quyền truy cập công khai.'}`,
+        });
+      }
+    };
 
   const handleConnectR2Manual = () => {
     if (!r2Url.trim()) {
