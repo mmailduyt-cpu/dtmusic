@@ -154,7 +154,7 @@ Nếu không thể tìm thấy lời chính xác, hãy sáng tạo một bài th
 Chỉ trả về lời bài hát thuần túy, tuyệt đối KHÔNG viết bất cứ câu thoại giải thích, nhận xét, tiêu đề phụ, ký tự gạch đầu dòng hứa hẹn, hoặc nhãn meta như [Verse], [Chorus]. Trình bày dạng các câu thơ liên tục phân tách dòng.`;
 
     const response = await client.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.0-flash",
       contents: prompt,
     });
 
