@@ -321,9 +321,8 @@ export default function Sidebar({
     // Extract file ID
     const match = driveUrl.match(/[-\w]{25,}/);
     const id = match ? match[0] : driveUrl;
-    // Sử dụng docs.google.com giúp tăng tốc dòng truyền tải, tương thích cao hơn khi deploy sang máy chủ tĩnh như Vercel
-    // Pass original streamUrl, App.tsx will handle proxying
-    const streamUrl = `https://docs.google.com/uc?export=download&id=${id}`;
+    // Dùng confirm=t để bỏ qua trang cảnh báo virus scanning của Google Drive
+    const streamUrl = `https://drive.google.com/uc?export=download&confirm=t&id=${id}`;
 
     const rawTitle = driveName.trim() || `Tệp mã ${id.substring(0, 5)}`;
     const title = `Drive - ${rawTitle}`;
@@ -1045,9 +1044,19 @@ export default function Sidebar({
                     <span>🟦</span> Kết nối với Google Drive
                   </button>
 
-                  <p className="text-[8px] text-muted leading-normal">
-                    Cần tạo OAuth Client ID tại <b>Google Cloud Console</b> với <b>Web application</b> type, thêm domain của bạn vào <b>Authorized redirect URIs</b>.
-                  </p>
+                  <div className="flex flex-col gap-1">
+                    <a
+                      href="https://console.cloud.google.com/apis/credentials"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[9px] text-[#4285F4] hover:text-[#3367D6] underline font-medium"
+                    >
+                      🔑 Mở Google Cloud Console → Credentials
+                    </a>
+                    <p className="text-[8px] text-muted leading-normal">
+                      Tạo <b>OAuth Client ID</b> loại <b>Web application</b>, thêm <code className="text-accent">{window.location.origin}</code> vào <b>Authorized redirect URIs</b> rồi copy Client ID và Secret vào ô trên.
+                    </p>
+                  </div>
                 </div>
               </div>
             )}

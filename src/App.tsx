@@ -724,7 +724,8 @@ export default function App() {
             throw new Error(errData.error || 'Không thể lấy presigned URL');
           }
           const { url } = await signRes.json();
-          audio.src = url;
+          // Presigned URL qua proxy để AudioContext.createMediaElementSource hoạt động
+          audio.src = getProxyUrl(url);
         } else {
           showToast('⚠️ Chưa có cấu hình kết nối S3. Vui lòng kết nối lại.');
           setIsPlaying(false);
