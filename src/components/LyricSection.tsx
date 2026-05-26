@@ -143,7 +143,7 @@ export default function LyricSection({
       <div
         ref={bodyRef}
         id="lyric-body"
-        className="flex-1 w-full overflow-y-auto px-6 py-12 scrollbar-none pb-24"
+        className={`flex-1 w-full overflow-y-auto scrollbar-none ${inline ? 'px-4 py-4 pb-8' : 'px-6 py-12 pb-24'}`}
       >
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted text-xs animate-pulse">

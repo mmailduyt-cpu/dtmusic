@@ -58,8 +58,8 @@ export default function App() {
     return saved !== 'false'; // Default is true
   });
 
-  // EQ active indicator (amber when panel closed but settings changed)
-  const eqActive = activePreset !== 'flat' || eqGains.some(g => g !== 0) || bassBoost > 0 || vocalClarity > 0 || surround3D > 0;
+  // EQ active indicator (amber when preset active)
+  const eqActive = activePreset !== 'flat';
 
   // Playback Control States
   const [isShuffle, setIsShuffle] = useState(false);
@@ -67,6 +67,9 @@ export default function App() {
 
   // Lyric States
   const [showLyrics, setShowLyrics] = useState(false);
+  const [showLyricMenu, setShowLyricMenu] = useState(false);
+  const lyricMenuRef = useRef<HTMLDivElement>(null);
+  const lyricFileRef = useRef<HTMLInputElement>(null);
   const [lyricMode, setLyricMode] = useState<LyricMode>('scroll');
   const [lyricLines, setLyricLines] = useState<LyricLine[]>([]);
   const [lyricSource, setLyricSource] = useState<'lrclib' | 'ai' | 'manual' | null>(null);
@@ -791,11 +794,15 @@ export default function App() {
 
     try {
       // 1. Fetch from LRCLIB API first
-      const query = new URLSearchParams({
-        track_name: track.title,
-        artist_name: track.artist || '',
+      const searchTitle = track.title.replace(/\[.*?\]|\(.*?\)/g, '').trim();
+      const searchArtist = (track.artist || '').replace(/[0-9]+.*/, '').trim();
+      console.log(`🔍 LRCLIB search: title="${searchTitle}" artist="${searchArtist}"`);
+
+      let query = new URLSearchParams({
+        track_name: searchTitle,
+        artist_name: searchArtist,
       });
-      const response = await fetch(`https://lrclib.net/api/search?${query}`, {
+      let response = await fetch(`https://lrclib.net/api/search?${query}`, {
         headers: { 'Lrclib-Client': 'SongNhacMusicPlayer/1.1' },
       });
 
@@ -810,12 +817,33 @@ export default function App() {
           };
         }
       }
+
+      // Retry with title only if artist search failed
+      if (!lyricsPayload && searchArtist) {
+        console.log('🔍 LRCLIB retry: title only');
+        query = new URLSearchParams({ track_name: searchTitle });
+        response = await fetch(`https://lrclib.net/api/search?${query}`, {
+          headers: { 'Lrclib-Client': 'SongNhacMusicPlayer/1.1' },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.length > 0) {
+            const matched = data[0];
+            lyricsPayload = {
+              synced: matched.syncedLyrics || null,
+              plain: matched.plainLyrics || null,
+              source: 'lrclib' as const,
+            };
+          }
+        }
+      }
     } catch (e) {
       console.warn("LRCLIB fetching error, falling back to Gemini:", e);
     }
 
     // 2. Fetch using Gemini back-end proxy if LRCLIB gave no match
     if (!lyricsPayload) {
+      console.log('🤖 Gemini AI lyric fetch:', track.title);
       try {
         const aiResponse = await fetch('/api/lyrics', {
           method: 'POST',
@@ -1355,7 +1383,7 @@ export default function App() {
           
           {/* Condition: show disc OR inline lyrics */}
           {showLyrics && activeTrack ? (
-            <div className="flex-1 flex items-center justify-center w-full min-h-[160px] md:min-h-[220px]">
+            <div className="flex-1 w-full min-h-0 max-h-[55vh] md:max-h-[60vh] overflow-hidden rounded-lg">
               <LyricSection
                 show={true}
                 onClose={() => setShowLyrics(false)}
@@ -1462,22 +1490,14 @@ export default function App() {
                   {eqActive && !showEQ && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />}
                 </button>
                 <button
-                  onClick={() => setShowLyrics(true)}
-                  className="text-[8.5px] md:text-[9px] font-bold px-2.5 py-0.5 rounded-full text-secondary hover:text-primary hover:bg-hover border border-border/80 cursor-pointer flex items-center gap-1"
+                  onClick={() => setShowLyrics(prev => !prev)}
+                  className={`text-[8.5px] md:text-[9px] font-bold px-2.5 py-0.5 rounded-full transition-all cursor-pointer flex items-center gap-1 border border-border/80 ${
+                    showLyrics ? 'bg-accent/20 border-accent text-accent shadow-sm' : 'text-secondary hover:text-primary hover:bg-hover'
+                  }`}
                 >
                   <span>🎵</span>
-                  <span>Lời hát</span>
+                  <span>Lời</span>
                 </button>
-                {!lyricLoading && (
-                  <button
-                    onClick={() => { if (activeTrack) fetchLyricsForTrack(activeTrack, currentTrackIndex); }}
-                    className="text-[8.5px] md:text-[9px] font-bold px-2.5 py-0.5 rounded-full text-secondary hover:text-accent hover:border-accent/30 border border-border/80 cursor-pointer flex items-center gap-1"
-                    title="Tìm lyric qua AI"
-                  >
-                    <span>🤖</span>
-                    <span>AI</span>
-                  </button>
-                )}
               </div>
             </div>
 
@@ -1589,21 +1609,63 @@ export default function App() {
           </div>
         </div>
 
-        {/* Center: Minimalist ambient digital visual wave */}
-        <div className="hidden md:flex items-center gap-1.5 h-5 px-3 bg-accent/5 rounded-full border border-border/40 shrink-0">
-          <div className={`flex items-center gap-0.5 h-4 ${isPlaying ? 'opacity-100' : 'opacity-35'}`}>
-            <span className="w-[1.5px] bg-accent/80 h-1 rounded animate-pulse" />
-            <span className="w-[1.5px] bg-accent/80 h-3.5 rounded animate-bounce" style={{ animationDuration: '0.8s' }} />
-            <span className="w-[1.5px] bg-accent/80 h-2 rounded animate-pulse" />
-            <span className="w-[1.5px] bg-accent/80 h-4 rounded animate-bounce" style={{ animationDuration: '0.6s' }} />
-            <span className="w-[1.5px] bg-accent/80 h-1.5 rounded animate-pulse" />
-            <span className="w-[1.5px] bg-accent/80 h-3 rounded animate-bounce" style={{ animationDuration: '0.7s' }} />
-            <span className="w-[1.5px] bg-accent/80 h-1 rounded animate-pulse" />
-            <span className="w-[1.5px] bg-accent/80 h-3.5 rounded animate-bounce" style={{ animationDuration: '0.9s' }} />
-            <span className="w-[1.5px] bg-accent/80 h-1.5 rounded animate-pulse" />
-            <span className="w-[1.5px] bg-accent/80 h-3 rounded animate-bounce" style={{ animationDuration: '0.5s' }} />
-          </div>
+        {/* Center: Lyrics menu with dropdown */}
+        <div className="relative shrink-0" ref={lyricMenuRef}>
+          <button
+            onClick={() => setShowLyricMenu(prev => !prev)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10.5px] font-bold border border-border/70 hover:border-accent/30 hover:text-accent transition-all cursor-pointer bg-accent/5"
+          >
+            <span>🎤</span>
+            <span>Lời</span>
+            <span className="text-[7px] opacity-60">{showLyricMenu ? '▲' : '▼'}</span>
+          </button>
+
+          {showLyricMenu && (
+            <>
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-secondary/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl p-1.5 min-w-[180px] z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
+                <button
+                  onClick={() => { setShowLyricMenu(false); setShowLyrics(true); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-semibold text-left hover:bg-accent/10 hover:text-accent transition-all cursor-pointer"
+                >
+                  <span>📖</span> Xem lời
+                </button>
+                <button
+                  onClick={() => { setShowLyricMenu(false); if (activeTrack) fetchLyricsForTrack(activeTrack, currentTrackIndex); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-semibold text-left hover:bg-accent/10 hover:text-accent transition-all cursor-pointer"
+                  disabled={!activeTrack || lyricLoading}
+                >
+                  <span>🔍</span> Tự tìm
+                </button>
+                <button
+                  onClick={() => { setShowLyricMenu(false); lyricFileRef.current?.click(); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-semibold text-left hover:bg-accent/10 hover:text-accent transition-all cursor-pointer"
+                >
+                  <span>📂</span> Tải file
+                </button>
+              </div>
+              <div className="fixed inset-0 z-40" onClick={() => setShowLyricMenu(false)} />
+            </>
+          )}
         </div>
+
+        {/* Hidden file input for lyric upload */}
+        <input
+          type="file"
+          ref={lyricFileRef}
+          accept=".lrc,.txt"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              const text = event.target?.result as string;
+              if (text) { handleManualLyricUpload(text); }
+            };
+            reader.readAsText(file);
+            e.target.value = '';
+          }}
+        />
 
         {/* Right Area: Spatial audio and Volume settings */}
         <div className="flex items-center gap-4 shrink-0">
