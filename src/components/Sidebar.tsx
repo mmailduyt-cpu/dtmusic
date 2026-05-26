@@ -806,7 +806,7 @@ export default function Sidebar({
                     className="w-full bg-primary/40 border border-border/70 hover:border-accent/40 focus:border-accent focus:ring-1 focus:ring-accent rounded-lg px-3 py-1.5 text-xs text-primary placeholder-muted/65 outline-none transition-all duration-200"
                   />
                   <p className="text-[9px] text-muted leading-normal">
-                    Nhạc từ R2 public bucket được phát <b>trực tiếp</b> (không qua proxy), tránh giới hạn Vercel.
+                    Nhạc từ R2 được proxy qua máy chủ (same-origin) để tương thích với <b>bộ EQ Web Audio</b>.
                     Yêu cầu bucket bật <b>"Public Access"</b> + <b>CORS Policy</b> như hướng dẫn bên dưới.
                   </p>
                 </div>

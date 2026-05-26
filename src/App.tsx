@@ -147,11 +147,6 @@ export default function App() {
     return `/api/proxy?${params.toString()}`;
   };
 
-  // Helper: phát trực tiếp từ R2 public (không proxy) nếu bucket public + CORS
-  const getDirectUrl = (targetUrl: string): string => {
-    return targetUrl;
-  };
-
   // Handle Google OAuth redirect callback on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1121,13 +1116,13 @@ export default function App() {
 
   const handleR2BulkAdd = (url: string, files: string[]) => {
     const items: Track[] = files.map((fileName) => {
-      // R2 public bucket: dùng URL trực tiếp (không proxy) để tránh Vercel timeout
-      // Yêu cầu bucket bật Public Access + CORS policy
+      // R2 bắt buộc qua proxy (same-origin) để AudioContext.createMediaElementSource hoạt động,
+      // tránh lỗi SecurityError khi cross-origin không có CORS
       const cleanBase = url.replace(/\/$/, '');
       const cleanPath = fileName.split('/')
         .map(segment => encodeURIComponent(segment))
         .join('/');
-      const directUrl = getDirectUrl(`${cleanBase}/${cleanPath}`);
+      const proxiedUrl = getProxyUrl(`${cleanBase}/${cleanPath}`);
 
       const title = `R2 - ${fileName.replace(/\.[^.]+$/, '')}`;
       
@@ -1136,7 +1131,7 @@ export default function App() {
         source: 'R2',
         title,
         artist: 'Cloudflare R2 Bucket',
-        url: directUrl,
+        url: proxiedUrl,
         r2BucketUrl: cleanBase, // Store original R2 bucket URL
         r2FileName: fileName, // Store original R2 file name
       };
