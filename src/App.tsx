@@ -25,9 +25,6 @@ import Visualizer from './components/Visualizer';
 
 import { Track, EQPreset, EQ_BANDS, EQ_PRESETS, LyricMode, LyricLine } from './types';
 
-// Phiên bản build được Vite inject tự động
-declare const __BUILD_VERSION__: string;
-
 export default function App() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(-1);
@@ -246,29 +243,6 @@ export default function App() {
         console.error(e);
       }
     }
-  }, []);
-
-  // ─── Auto version check & reload ───
-  // Poll /api/version mỗi 60s, nếu khác build hiện tại thì reload để cập nhật
-  useEffect(() => {
-    const BUILD_VERSION = typeof __BUILD_VERSION__ !== 'undefined' ? __BUILD_VERSION__ : '0';
-
-    const checkVersion = async () => {
-      try {
-        const res = await fetch('/api/version');
-        const data = await res.json();
-        if (data.v && data.v !== BUILD_VERSION) {
-          showToast('🔄 Phiên bản mới đã được triển khai. Đang tải lại...');
-          setTimeout(() => window.location.reload(), 1500);
-        }
-      } catch {
-        // Bỏ qua lỗi mạng, đợi lần kiểm tra sau
-      }
-    };
-
-    checkVersion();
-    const interval = setInterval(checkVersion, 60000);
-    return () => clearInterval(interval);
   }, []);
 
   // Save changes to local storage whenever tracklists adapt
