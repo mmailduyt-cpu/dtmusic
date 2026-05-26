@@ -23,7 +23,7 @@ import LyricSection from './components/LyricSection';
 import MiniPlayer from './components/MiniPlayer';
 import Visualizer from './components/Visualizer';
 
-import { Track, EQPreset, EQ_BANDS, EQ_PRESETS, LyricMode, LyricLine, S3Connection } from './types';
+import { Track, EQPreset, EQ_BANDS, EQ_PRESETS, LyricMode, LyricLine } from './types';
 
 export default function App() {
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -113,25 +113,6 @@ export default function App() {
   const prevObjectURLRef = useRef<string | null>(null);
   const bgUploadRef = useRef<HTMLInputElement>(null);
 
-  // S3 Connection State
-  const [s3Connection, setS3Connection] = useState<S3Connection | null>(() => {
-    try {
-      const saved = localStorage.getItem('dt_s3_connection');
-      return saved ? JSON.parse(saved) : null;
-    } catch { return null; }
-  });
-
-  // Google Drive OAuth State
-  const [driveToken, setDriveToken] = useState<{accessToken: string; refreshToken?: string; expiresIn: number} | null>(() => {
-    try {
-      const saved = localStorage.getItem('dt_drive_token');
-      return saved ? JSON.parse(saved) : null;
-    } catch { return null; }
-  });
-
-  const [driveClientId, setDriveClientId] = useState(() => localStorage.getItem('dt_drive_client_id') || '');
-  const [driveClientSecret, setDriveClientSecret] = useState(() => localStorage.getItem('dt_drive_client_secret') || '');
-
   // Worker proxy do chủ web deploy, set qua env VITE_WORKER_URL khi build
   // (ví dụ VITE_WORKER_URL=https://proxy.domain.workers.dev)
   // Nếu không set, mọi proxy sẽ fallback qua /api/proxy (Vercel)
@@ -145,64 +126,6 @@ export default function App() {
       return `${WORKER_BASE.replace(/\/$/, '')}/?${params.toString()}`;
     }
     return `/api/proxy?${params.toString()}`;
-  };
-
-  // Handle Google OAuth redirect callback on mount
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get('code');
-    const pending = sessionStorage.getItem('dt_drive_oauth_pending');
-    if (code && pending) {
-      sessionStorage.removeItem('dt_drive_oauth_pending');
-      window.history.replaceState({}, '', window.location.pathname);
-      const storedClientId = localStorage.getItem('dt_drive_client_id') || driveClientId;
-      const storedClientSecret = localStorage.getItem('dt_drive_client_secret') || driveClientSecret;
-      if (storedClientId && storedClientSecret) {
-        exchangeDriveCode(code, storedClientId, storedClientSecret);
-      }
-    }
-  }, []);
-
-  const exchangeDriveCode = async (code: string, clientId: string, clientSecret: string) => {
-    try {
-      const res = await fetch('/api/drive/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, clientId, clientSecret, redirectUri: window.location.origin }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setDriveToken(data);
-      localStorage.setItem('dt_drive_token', JSON.stringify(data));
-      showToast('✅ Đã kết nối Google Drive thành công!');
-    } catch (err: any) {
-      showToast(`❌ Lỗi kết nối Google Drive: ${err.message}`);
-    }
-  };
-
-  const handleBgUpload = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (prevObjectURLRef.current && prevObjectURLRef.current.startsWith('blob:')) {
-        URL.revokeObjectURL(prevObjectURLRef.current);
-      }
-      const url = URL.createObjectURL(file);
-      prevObjectURLRef.current = url;
-      setBgType('custom');
-      setBgValue(url);
-      showToast('🌅 Đã tải ảnh nền của bạn thành công!');
-    }
-  };
-
-  // Display Toast helper
-  const showToast = (msg: string) => {
-    if (toastTimeoutRef.current) {
-      clearTimeout(toastTimeoutRef.current);
-    }
-    setToast({ show: true, msg });
-    toastTimeoutRef.current = window.setTimeout(() => {
-      setToast({ show: false, msg: '' });
-    }, 3000);
   };
 
   // Accent colors configuration mapping
@@ -239,6 +162,31 @@ export default function App() {
     }
   };
 
+  const handleBgUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (prevObjectURLRef.current && prevObjectURLRef.current.startsWith('blob:')) {
+        URL.revokeObjectURL(prevObjectURLRef.current);
+      }
+      const url = URL.createObjectURL(file);
+      prevObjectURLRef.current = url;
+      setBgType('custom');
+      setBgValue(url);
+      showToast('🌅 Đã tải ảnh nền của bạn thành công!');
+    }
+  };
+
+  // Display Toast helper
+  const showToast = (msg: string) => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    setToast({ show: true, msg });
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setToast({ show: false, msg: '' });
+    }, 3000);
+  };
+
   // Sync style properties of Accent selections dynamically
   useEffect(() => {
     const colors = accentColors[accent] || accentColors.violet;
@@ -263,73 +211,6 @@ export default function App() {
     localStorage.setItem('dt_surround_3d', surround3D.toString());
     localStorage.setItem('dt_compressor_enabled', compressorEnabled.toString());
   }, [bassBoost, vocalClarity, surround3D, compressorEnabled]);
-
-  // Persist S3 connection
-  useEffect(() => {
-    if (s3Connection) {
-      localStorage.setItem('dt_s3_connection', JSON.stringify(s3Connection));
-    } else {
-      localStorage.removeItem('dt_s3_connection');
-    }
-  }, [s3Connection]);
-
-  const handleS3ConnectionChange = (conn: S3Connection | null) => {
-    setS3Connection(conn);
-  };
-
-  // Persist Drive credentials
-  useEffect(() => {
-    if (driveToken) localStorage.setItem('dt_drive_token', JSON.stringify(driveToken));
-    else localStorage.removeItem('dt_drive_token');
-  }, [driveToken]);
-
-  useEffect(() => { localStorage.setItem('dt_drive_client_id', driveClientId); }, [driveClientId]);
-  useEffect(() => { localStorage.setItem('dt_drive_client_secret', driveClientSecret); }, [driveClientSecret]);
-
-  const handleDriveDisconnect = () => {
-    setDriveToken(null);
-    localStorage.removeItem('dt_drive_token');
-    showToast('🔌 Đã ngắt kết nối Google Drive');
-  };
-
-  const refreshDriveToken = async () => {
-    if (!driveToken?.refreshToken || !driveClientId || !driveClientSecret) return false;
-    try {
-      const res = await fetch('/api/drive/refresh', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: driveToken.refreshToken, clientId: driveClientId, clientSecret: driveClientSecret }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      const updated = { ...driveToken, accessToken: data.access_token, expiresIn: data.expires_in };
-      setDriveToken(updated);
-      localStorage.setItem('dt_drive_token', JSON.stringify(updated));
-      return true;
-    } catch (err) {
-      console.error('Failed to refresh Drive token:', err);
-      return false;
-    }
-  };
-
-  const getDriveStreamUrl = async (webContentLink: string): Promise<string | null> => {
-    if (!driveToken?.accessToken) return null;
-    return getProxyUrl(webContentLink, driveToken.accessToken);
-  };
-
-  const handleDriveBulkAdd = (files: { id: string; title: string; webContentLink: string }[]) => {
-    const items: Track[] = files.map((f) => ({
-      id: `drive_${f.id}_${Date.now()}`,
-      source: 'Drive' as const,
-      title: f.title.replace(/\.[^.]+$/, ''),
-      artist: 'Google Drive',
-      url: '',
-      originalCloudUrl: f.webContentLink,
-    }));
-    const updated = [...tracks, ...items];
-    savePlaylist(updated);
-    showToast(`✅ Đã thêm ${items.length} bài hát từ Google Drive`);
-  };
 
   // Restore Theme & Storage Playlist on mount
   useEffect(() => {
@@ -711,49 +592,12 @@ export default function App() {
         setIsPlaying(false);
         return;
       }
-    } else if (track.source === 'S3') {
-      try {
-        if (s3Connection) {
-          const signRes = await fetch('/api/s3/sign', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...s3Connection, fileKey: track.fileKey }),
-          });
-          if (!signRes.ok) {
-            const errData = await signRes.json();
-            throw new Error(errData.error || 'Không thể lấy presigned URL');
-          }
-          const { url } = await signRes.json();
-          // Presigned URL qua proxy để AudioContext.createMediaElementSource hoạt động
-          audio.src = getProxyUrl(url);
-        } else {
-          showToast('⚠️ Chưa có cấu hình kết nối S3. Vui lòng kết nối lại.');
-          setIsPlaying(false);
-          return;
-        }
-      } catch (err: any) {
-        showToast(`❌ Lỗi phát S3: ${err.message}`);
-        setIsPlaying(false);
-        return;
-      }
     } else if (track.source === 'Drive') {
-      // Drive phát qua proxy đã wrap sẵn trong track.url (từ handleCloudTrackAdd)
-      // Nếu có OAuth token, ưu tiên dùng proxy có access_token
-      let url: string | null = null;
-      if (track.originalCloudUrl) {
-        url = await getDriveStreamUrl(track.originalCloudUrl);
-        if (!url && driveToken?.refreshToken) {
-          const refreshed = await refreshDriveToken();
-          if (refreshed) url = await getDriveStreamUrl(track.originalCloudUrl);
-        }
-      }
-      if (url) {
-        audio.src = url;
-      } else if (track.url) {
-        // Fallback: dùng URL đã proxy sẵn (cho single URL mode không OAuth)
+      // URL đã được proxy sẵn từ handleCloudTrackAdd, phát trực tiếp
+      if (track.url) {
         audio.src = track.url;
       } else {
-        showToast('⚠️ Google Drive chưa được kết nối. Vui lòng kết nối lại.');
+        showToast('⚠️ Không có URL phát cho bài hát này.');
         setIsPlaying(false);
         return;
       }
@@ -1142,23 +986,6 @@ export default function App() {
     showToast(`✅ Đã đồng bộ thêm ${items.length} bài hát từ R2`);
   };
 
-  const handleS3BulkAdd = (files: { key: string; size: number }[]) => {
-    const items: Track[] = files.map((f) => {
-      const title = f.key.split('/').pop()?.replace(/\.[^.]+$/, '') || f.key;
-      return {
-        id: `s3_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        source: 'S3' as const,
-        title,
-        artist: 'S3 Cloud Storage',
-        fileKey: f.key,
-        url: '',
-      };
-    });
-    const updated = [...tracks, ...items];
-    savePlaylist(updated);
-    showToast(`✅ Đã thêm ${items.length} bài hát từ S3`);
-  };
-
   const handleTrackUpdate = (id: string, updatedFields: Partial<Track>) => {
     const updated = tracks.map((t) => (t.id === id ? { ...t, ...updatedFields } : t));
     savePlaylist(updated);
@@ -1227,16 +1054,6 @@ export default function App() {
         onTrackUpdate={handleTrackUpdate}
         isOpen={showSidebar}
         onClose={() => setShowSidebar(false)}
-        s3Connection={s3Connection}
-        onS3ConnectionChange={handleS3ConnectionChange}
-        onS3BulkAdd={handleS3BulkAdd}
-        driveClientId={driveClientId}
-        driveClientSecret={driveClientSecret}
-        onDriveClientIdChange={setDriveClientId}
-        onDriveClientSecretChange={setDriveClientSecret}
-        driveToken={driveToken}
-        onDriveDisconnect={handleDriveDisconnect}
-        onDriveBulkAdd={handleDriveBulkAdd}
         onClearAll={handleClearAll}
       />
 
