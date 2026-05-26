@@ -40,9 +40,6 @@ export default function App() {
   const [activePreset, setActivePreset] = useState<EQPreset>('flat');
   const [eqGains, setEqGains] = useState<number[]>([0, 0, 0, 0, 0]);
 
-  // EQ có đang được chỉnh hay không (dùng để hiển thị trạng thái)
-  const eqActive = activePreset !== 'flat' || eqGains.some(g => g !== 0) || bassBoost > 0 || vocalClarity > 0 || surround3D > 0;
-
   // Audio Enhancer States
   const [bassBoost, setBassBoost] = useState<number>(() => {
     const saved = localStorage.getItem('dt_bass_boost');
@@ -60,6 +57,9 @@ export default function App() {
     const saved = localStorage.getItem('dt_compressor_enabled');
     return saved !== 'false'; // Default is true
   });
+
+  // EQ có đang được chỉnh hay không (dùng để hiển thị trạng thái)
+  const eqActive = activePreset !== 'flat' || eqGains.some(g => g !== 0) || bassBoost > 0 || vocalClarity > 0 || surround3D > 0;
 
   // Playback Control States
   const [isShuffle, setIsShuffle] = useState(false);
@@ -249,7 +249,7 @@ export default function App() {
   const savePlaylist = (updated: Track[]) => {
     setTracks(updated);
     // Strip file streams or lost object values before serializing
-    const serializable = updated.map(({ id, source, title, artist, album, duration, art, url, missing, fileKey, originalCloudUrl, r2BucketUrl, r2FileName, lyricData }) => ({
+    const serializable = updated.map(({ id, source, title, artist, album, duration, art, url, missing, originalCloudUrl, r2BucketUrl, r2FileName, lyricData }) => ({
       id,
       source,
       title,
@@ -259,7 +259,6 @@ export default function App() {
       art,
       url,
       missing,
-      fileKey,
       originalCloudUrl,
       r2BucketUrl,
       r2FileName,

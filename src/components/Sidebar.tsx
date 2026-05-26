@@ -404,7 +404,7 @@ export default function Sidebar({
           </div>
         )}
 
-        {/* CLOUDFLARE R2 / S3 TAB */}
+        {/* CLOUDFLARE R2 TAB */}
         {activeTab === 'r2' && (
           <div className="space-y-2">
             <div className="flex items-center gap-1">
@@ -701,7 +701,6 @@ export default function Sidebar({
             >
               <option value="all">Nguồn</option>
               <option value="local">Local</option>
-              <option value="S3">S3 Cloud</option>
               <option value="R2">Cloud R2</option>
               <option value="Drive">Drive</option>
               <option value="Dropbox">Dropbox</option>
@@ -734,11 +733,9 @@ export default function Sidebar({
                     }`}
                   >
                     {/* Item Thumbnail */}
-                    <div className={`w-8 h-8 rounded-md bg-secondary flex items-center justify-center shrink-0 overflow-hidden border border-border ${track.source === 'S3' ? 'border-accent/20' : ''}`}>
+                    <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center shrink-0 overflow-hidden border border-border">
                       {track.art ? (
                         <img src={track.art} alt={track.title} className="w-full h-full object-cover" />
-                      ) : track.source === 'S3' ? (
-                        <Cloud className={`w-4 h-4 ${isActive ? 'text-accent' : 'text-muted'}`} />
                       ) : track.source === 'Drive' ? (
                         <HardDrive className={`w-4 h-4 ${isActive ? 'text-accent' : 'text-muted'}`} />
                       ) : track.source === 'Dropbox' ? (
