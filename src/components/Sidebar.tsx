@@ -178,6 +178,25 @@ export default function Sidebar({
     setR2FilesText('');
   };
 
+  const handleConnectDrive = () => {
+    if (!driveUrl.trim()) return;
+
+    const match = driveUrl.match(/[-\w]{25,}/);
+    const id = match ? match[0] : driveUrl;
+    const streamUrl = `https://www.googleapis.com/drive/v3/files/${id}?alt=media&key=${(import.meta as any).env?.VITE_GOOGLE_API_KEY || ''}`;
+
+    const rawTitle = driveName.trim() || `Tệp mã ${id.substring(0, 5)}`;
+    onCloudTrackAdd({
+      source: 'Drive',
+      title: `Drive - ${rawTitle}`,
+      artist: 'Google Drive Stream',
+      url: streamUrl,
+    });
+
+    setDriveUrl('');
+    setDriveName('');
+  };
+
   const handleConnectDropbox = () => {
     if (!dropboxUrl.trim()) return;
 
