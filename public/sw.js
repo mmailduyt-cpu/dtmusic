@@ -1,4 +1,4 @@
-const CACHE_NAME = 'songnhac-v1.1';
+const CACHE_NAME = 'songnhac-v1.2';
 const ASSETS = [
   '/',
   '/index.html',
@@ -32,6 +32,12 @@ self.addEventListener('fetch', (e) => {
 
   // Do not intercept or cache stream audio clips or API proxy tracks
   if (url.match(/\.(mp3|flac|aac|ogg|wav|m4a)$/i) || url.includes('/api/')) {
+    e.respondWith(fetch(e.request));
+    return;
+  }
+
+  // Always fetch sw.js from network to detect updates
+  if (url.includes('/sw.js')) {
     e.respondWith(fetch(e.request));
     return;
   }
