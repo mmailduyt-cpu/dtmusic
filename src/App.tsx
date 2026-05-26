@@ -25,9 +25,6 @@ import Visualizer from './components/Visualizer';
 
 import { Track, EQPreset, EQ_BANDS, EQ_PRESETS, LyricMode, LyricLine } from './types';
 
-// Phiên bản build được Vite inject tự động
-declare const __BUILD_VERSION__: string;
-
 export default function App() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(-1);
@@ -42,9 +39,6 @@ export default function App() {
   const [showEQ, setShowEQ] = useState(false);
   const [activePreset, setActivePreset] = useState<EQPreset>('flat');
   const [eqGains, setEqGains] = useState<number[]>([0, 0, 0, 0, 0]);
-
-  // EQ có đang được chỉnh hay không (dùng để hiển thị trạng thái)
-  const eqActive = activePreset !== 'flat' || eqGains.some(g => g !== 0) || bassBoost > 0 || vocalClarity > 0 || surround3D > 0;
 
   // Audio Enhancer States
   const [bassBoost, setBassBoost] = useState<number>(() => {
@@ -246,29 +240,6 @@ export default function App() {
         console.error(e);
       }
     }
-  }, []);
-
-  // ─── Auto version check & reload ───
-  // Poll /api/version mỗi 60s, nếu khác build hiện tại thì reload để cập nhật
-  useEffect(() => {
-    const BUILD_VERSION = typeof __BUILD_VERSION__ !== 'undefined' ? __BUILD_VERSION__ : '0';
-
-    const checkVersion = async () => {
-      try {
-        const res = await fetch('/api/version');
-        const data = await res.json();
-        if (data.v && data.v !== BUILD_VERSION) {
-          showToast('🔄 Phiên bản mới đã được triển khai. Đang tải lại...');
-          setTimeout(() => window.location.reload(), 1500);
-        }
-      } catch {
-        // Bỏ qua lỗi mạng, đợi lần kiểm tra sau
-      }
-    };
-
-    checkVersion();
-    const interval = setInterval(checkVersion, 60000);
-    return () => clearInterval(interval);
   }, []);
 
   // Save changes to local storage whenever tracklists adapt
@@ -1460,12 +1431,11 @@ export default function App() {
                 <button
                   onClick={() => setShowEQ((prev) => !prev)}
                   className={`text-[10.5px] md:text-[11px] font-bold px-3 py-1 rounded-full transition-all cursor-pointer flex items-center gap-1.5 border border-border ${
-                    showEQ ? 'bg-accent/20 border-accent text-accent font-extrabold shadow-sm' : eqActive ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 'text-secondary hover:text-primary hover:bg-hover'
+                    showEQ ? 'bg-accent/20 border-accent text-accent font-extrabold shadow-sm' : 'text-secondary hover:text-primary hover:bg-hover'
                   }`}
                 >
                   <span>🎛️</span>
                   <span>EQ</span>
-                  {eqActive && !showEQ && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />}
                 </button>
                 <button
                   onClick={() => setShowLyrics(true)}

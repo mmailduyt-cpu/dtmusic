@@ -175,14 +175,6 @@ Chỉ trả về lời bài hát thuần túy, tuyệt đối KHÔNG viết bấ
   }
 });
 
-// ─── Version check endpoint ───
-// Trả về phiên bản build hiện tại để client auto-reload khi deploy mới
-app.get("/api/version", (req, res) => {
-  res.json({
-    v: process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_URL || String(Date.now()),
-  });
-});
-
 // Configure Vite or Static Asset Router
 async function start() {
   if (process.env.NODE_ENV !== "production") {
