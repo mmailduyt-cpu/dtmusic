@@ -7,7 +7,7 @@ export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
     define: {
-      __BUILD_VERSION__: JSON.stringify(Date.now().toString()),
+      __BUILD_VERSION__: JSON.stringify(process.env.VERCEL_GIT_COMMIT_SHA || Date.now().toString()),
     },
     resolve: {
       alias: {

@@ -176,11 +176,17 @@ Chỉ trả về lời bài hát thuần túy, tuyệt đối KHÔNG viết bấ
 });
 
 // ─── Version check endpoint ───
-// Trả về phiên bản build hiện tại để client auto-reload khi deploy mới
+// Đọc từ file JSON được tạo trong build script, fallback về env hoặc timestamp
+let buildVersion: string | undefined;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  buildVersion = require(path.join(__dirname, "build-version.json")).v;
+} catch {
+  buildVersion = process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_URL || String(Date.now());
+}
+
 app.get("/api/version", (req, res) => {
-  res.json({
-    v: process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_URL || String(Date.now()),
-  });
+  res.json({ v: buildVersion });
 });
 
 // Configure Vite or Static Asset Router
