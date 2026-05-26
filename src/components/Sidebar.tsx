@@ -70,7 +70,6 @@ export default function Sidebar({
     msg: '',
   });
   const [r2FilesText, setR2FilesText] = useState<string>('');
-  const [showCorsGuide, setShowCorsGuide] = useState(false);
 
   // Google Drive State
   const [driveUrl, setDriveUrl] = useState('');
@@ -404,7 +403,7 @@ export default function Sidebar({
           </div>
         )}
 
-        {/* CLOUDFLARE R2 / S3 TAB */}
+        {/* CLOUDFLARE R2 TAB */}
         {activeTab === 'r2' && (
           <div className="space-y-2">
             <div className="flex items-center gap-1">
@@ -430,7 +429,7 @@ export default function Sidebar({
                   />
                   <p className="text-[11px] text-muted leading-normal">
                     Nhạc từ R2 được proxy qua máy chủ (same-origin) để tương thích với <b>bộ EQ Web Audio</b>.
-                    Yêu cầu bucket bật <b>"Public Access"</b> + <b>CORS Policy</b> như hướng dẫn bên dưới.
+                    Yêu cầu bucket bật <b>"Public Access"</b>.
                   </p>
                 </div>
 
@@ -446,7 +445,7 @@ export default function Sidebar({
 
                 <div className="space-y-1">
                   <label className="block text-[10.5px] font-extrabold uppercase tracking-wider text-secondary/90">
-                    Hoặc dán tên tệp hoặc URL trực tiếp
+                    Dán tên file hoặc URL (mỗi dòng một file)
                   </label>
                   <textarea
                     rows={3}
@@ -462,46 +461,6 @@ export default function Sidebar({
                     💾 Nạp nhạc thủ công
                   </button>
                 </div>
-
-                <button
-                  onClick={() => setShowCorsGuide(!showCorsGuide)}
-                  className="w-full py-1 px-2 rounded-lg text-[8.5px] font-bold text-muted border border-border/50 hover:border-accent/30 hover:text-accent transition-all cursor-pointer flex items-center justify-center gap-1"
-                >
-                  {showCorsGuide ? '▲ Ẩn' : '▼'} Hướng dẫn cấu hình CORS cho R2
-                </button>
-
-                {showCorsGuide && (
-                  <div className="bg-primary/40 border border-border/60 rounded-lg p-2.5 space-y-1.5">
-                    <p className="text-[8.5px] text-secondary font-semibold leading-relaxed">
-                      Vào tab <b>Settings</b> của Bucket trên Cloudflare &gt; <b>CORS Policy</b> &gt; bấm Edit và dán:
-                    </p>
-                    <div className="relative">
-                      <pre className="text-[10.5px] font-mono text-primary bg-secondary/80 rounded p-2 overflow-x-auto leading-relaxed border border-border/40">
-{`[
-  {
-    "AllowedOrigins": ["*"],
-    "AllowedMethods": ["GET", "HEAD"],
-    "AllowedHeaders": ["*"],
-    "ExposeHeaders": [
-      "Content-Range",
-      "Content-Length",
-      "Accept-Ranges"
-    ]
-  }
-]`}
-                      </pre>
-                      <button
-                        onClick={() => {
-                          const corsText = `[\n  {\n    "AllowedOrigins": ["*"],\n    "AllowedMethods": ["GET", "HEAD"],\n    "AllowedHeaders": ["*"],\n    "ExposeHeaders": ["Content-Range", "Content-Length", "Accept-Ranges"]\n  }\n]`;
-                          navigator.clipboard.writeText(corsText);
-                        }}
-                        className="absolute top-1 right-1 text-[11px] px-1.5 py-0.5 rounded bg-accent/20 text-accent hover:bg-accent/30 transition-all cursor-pointer font-bold"
-                      >
-                        📋 Copy
-                      </button>
-                    </div>
-                  </div>
-                )}
 
                 {r2Status.type !== 'idle' && (
                   <div
@@ -701,7 +660,6 @@ export default function Sidebar({
             >
               <option value="all">Nguồn</option>
               <option value="local">Local</option>
-              <option value="S3">S3 Cloud</option>
               <option value="R2">Cloud R2</option>
               <option value="Drive">Drive</option>
               <option value="Dropbox">Dropbox</option>
@@ -734,11 +692,9 @@ export default function Sidebar({
                     }`}
                   >
                     {/* Item Thumbnail */}
-                    <div className={`w-8 h-8 rounded-md bg-secondary flex items-center justify-center shrink-0 overflow-hidden border border-border ${track.source === 'S3' ? 'border-accent/20' : ''}`}>
+                    <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center shrink-0 overflow-hidden border border-border">
                       {track.art ? (
                         <img src={track.art} alt={track.title} className="w-full h-full object-cover" />
-                      ) : track.source === 'S3' ? (
-                        <Cloud className={`w-4 h-4 ${isActive ? 'text-accent' : 'text-muted'}`} />
                       ) : track.source === 'Drive' ? (
                         <HardDrive className={`w-4 h-4 ${isActive ? 'text-accent' : 'text-muted'}`} />
                       ) : track.source === 'Dropbox' ? (

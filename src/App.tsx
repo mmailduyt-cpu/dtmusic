@@ -58,6 +58,9 @@ export default function App() {
     return saved !== 'false'; // Default is true
   });
 
+  // EQ active indicator (amber when panel closed but settings changed)
+  const eqActive = activePreset !== 'flat' || eqGains.some(g => g !== 0) || bassBoost > 0 || vocalClarity > 0 || surround3D > 0;
+
   // Playback Control States
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState<0 | 1 | 2>(0); // 0 = no repeat, 1 = repeat all, 2 = repeat one
@@ -246,7 +249,7 @@ export default function App() {
   const savePlaylist = (updated: Track[]) => {
     setTracks(updated);
     // Strip file streams or lost object values before serializing
-    const serializable = updated.map(({ id, source, title, artist, album, duration, art, url, missing, fileKey, originalCloudUrl, r2BucketUrl, r2FileName, lyricData }) => ({
+    const serializable = updated.map(({ id, source, title, artist, album, duration, art, url, missing, originalCloudUrl, r2BucketUrl, r2FileName, lyricData }) => ({
       id,
       source,
       title,
@@ -256,7 +259,6 @@ export default function App() {
       art,
       url,
       missing,
-      fileKey,
       originalCloudUrl,
       r2BucketUrl,
       r2FileName,
@@ -780,6 +782,7 @@ export default function App() {
     // Check local storage records
     if (track.lyricData) {
       parseAndSetLyrics(track.lyricData);
+      setShowLyrics(true);
       return;
     }
 
@@ -840,6 +843,7 @@ export default function App() {
 
     if (lyricsPayload) {
       parseAndSetLyrics(lyricsPayload);
+      setShowLyrics(true);
       // Save permanently in metadata playlist JSON record so we only query once
       const updatedTracks = [...tracks];
       updatedTracks[trackIdx] = { ...track, lyricData: lyricsPayload };
@@ -1343,30 +1347,34 @@ export default function App() {
           onCompressorToggle={handleCompressorToggle}
         />
 
-        {/* Synchronized full lyrics modal */}
-        <LyricSection
-          show={showLyrics}
-          onClose={() => setShowLyrics(false)}
-          track={activeTrack}
-          currentTime={currentTime}
-          lyricLines={lyricLines}
-          lyricMode={lyricMode}
-          onModeChange={setLyricMode}
-          lyricSource={lyricSource}
-          isLoading={lyricLoading}
-          onManualLyricUpload={handleManualLyricUpload}
-          onSeek={seekTime}
-        />
-
         {/* Visualizers canvas at the bottom */}
         <Visualizer analyser={analyserRef.current} isPlaying={isPlaying} isSimulated={activeTrack ? !isTrackCORSCompatible(activeTrack.source) : false} />
 
         {/* Disc Rotate vinyl container centering */}
         <div className="relative z-10 flex flex-col items-center max-w-sm w-full h-[95%] md:h-full justify-center md:justify-between py-2 pb-6 md:py-6 md:pb-0 gap-3 md:gap-4">
           
-          {/* Centered Vinyl disc block with Aura radial backdrop */}
-          <div className="flex-1 flex items-center justify-center w-full min-h-[160px] md:min-h-[220px]">
-            <div className="relative group cursor-pointer" onClick={togglePlay}>
+          {/* Condition: show disc OR inline lyrics */}
+          {showLyrics && activeTrack ? (
+            <div className="flex-1 flex items-center justify-center w-full min-h-[160px] md:min-h-[220px]">
+              <LyricSection
+                show={true}
+                onClose={() => setShowLyrics(false)}
+                track={activeTrack}
+                currentTime={currentTime}
+                lyricLines={lyricLines}
+                lyricMode={lyricMode}
+                onModeChange={setLyricMode}
+                lyricSource={lyricSource}
+                isLoading={lyricLoading}
+                onManualLyricUpload={handleManualLyricUpload}
+                onSeek={seekTime}
+                inline
+              />
+            </div>
+          ) : (
+            /* Centered Vinyl disc block with Aura radial backdrop */
+            <div className="flex-1 flex items-center justify-center w-full min-h-[160px] md:min-h-[220px]">
+              <div className="relative group cursor-pointer" onClick={togglePlay}>
               
               {/* Back glowing aura shadow linked to active track */}
               <div
@@ -1391,11 +1399,15 @@ export default function App() {
                   background: 'repeating-radial-gradient(circle, #242424, #121212 2.5px, #0f0f0f 5px, #1a1a1a 6px, #121212 7px)',
                 }}
               >
-                {/* Center Vinyl Sticker Label - Only containing a clean enlarged music note icon */}
+                {/* Center Vinyl Sticker Label - Album art or clean music note */}
                 <div className="w-[60px] h-[60px] md:w-[96px] md:h-[96px] rounded-full bg-linear-to-tr from-[#1b192e] to-[#0a0a0f] border border-neutral-900/80 flex items-center justify-center overflow-hidden relative shadow-lg shrink-0">
-                  <div className="w-full h-full flex items-center justify-center text-accent">
-                    <Music className={`w-7 h-7 md:w-11 md:h-11 text-accent stroke-[2.5] drop-shadow-[0_0_8px_var(--accent)] ${isPlaying ? 'animate-pulse scale-105' : 'opacity-85'}`} />
-                  </div>
+                  {activeTrack?.art ? (
+                    <img src={activeTrack.art} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-accent">
+                      <Music className={`w-7 h-7 md:w-11 md:h-11 text-accent stroke-[2.5] drop-shadow-[0_0_8px_var(--accent)] ${isPlaying ? 'animate-pulse scale-105' : 'opacity-85'}`} />
+                    </div>
+                  )}
 
                   {/* Metal center dynamic spindle pin hole */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -1406,7 +1418,18 @@ export default function App() {
                 </div>
               </div>
             </div>
-          </div>
+          </div>)}
+
+          {/* Lyric preview below disc when lyrics hidden */}
+          {!showLyrics && lyricLines.length > 0 && !lyricLoading && (
+            <div className="w-full text-center px-4 -mt-2 mb-1">
+              <p className="text-[10px] md:text-xs text-accent/80 font-medium leading-relaxed truncate max-w-xs mx-auto italic drop-shadow-[0_0_8px_rgba(168,85,247,0.2)]">
+                {lyricLines.find((l, i) => l.time <= currentTime && (!lyricLines[i + 1] || lyricLines[i + 1].time > currentTime))?.text ||
+                 lyricLines.find(l => l.time <= currentTime)?.text ||
+                 lyricLines[0]?.text}
+              </p>
+            </div>
+          )}
 
           {/* ACTIVE SONG INFO & CONTROLLER BOX (The Bento Hub) */}
           <div className="w-full glass-card glow-border p-4 rounded-2xl flex flex-col items-center shadow-2xl space-y-3 md:space-y-4">
@@ -1431,11 +1454,12 @@ export default function App() {
                 <button
                   onClick={() => setShowEQ((prev) => !prev)}
                   className={`text-[10.5px] md:text-[11px] font-bold px-3 py-1 rounded-full transition-all cursor-pointer flex items-center gap-1.5 border border-border ${
-                    showEQ ? 'bg-accent/20 border-accent text-accent font-extrabold shadow-sm' : 'text-secondary hover:text-primary hover:bg-hover'
+                    showEQ ? 'bg-accent/20 border-accent text-accent font-extrabold shadow-sm' : eqActive ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 'text-secondary hover:text-primary hover:bg-hover'
                   }`}
                 >
                   <span>🎛️</span>
                   <span>EQ</span>
+                  {eqActive && !showEQ && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />}
                 </button>
                 <button
                   onClick={() => setShowLyrics(true)}
@@ -1444,6 +1468,16 @@ export default function App() {
                   <span>🎵</span>
                   <span>Lời hát</span>
                 </button>
+                {!lyricLoading && (
+                  <button
+                    onClick={() => { if (activeTrack) fetchLyricsForTrack(activeTrack, currentTrackIndex); }}
+                    className="text-[8.5px] md:text-[9px] font-bold px-2.5 py-0.5 rounded-full text-secondary hover:text-accent hover:border-accent/30 border border-border/80 cursor-pointer flex items-center gap-1"
+                    title="Tìm lyric qua AI"
+                  >
+                    <span>🤖</span>
+                    <span>AI</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1573,11 +1607,6 @@ export default function App() {
 
         {/* Right Area: Spatial audio and Volume settings */}
         <div className="flex items-center gap-4 shrink-0">
-          {/* Dolby badge */}
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-accent/5 rounded border border-accent/15">
-            <Sparkles className="w-3 h-3 text-accent animate-spin" style={{ animationDuration: '6s' }} />
-            <span className="text-[8.5px] text-accent font-extrabold uppercase font-mono tracking-wider">Dolby HQ Audio</span>
-          </div>
 
           {/* Volume Control widget */}
           <div className="flex items-center gap-2 w-28 md:w-32 shrink-0">

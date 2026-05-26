@@ -19,6 +19,7 @@ interface LyricSectionProps {
   isLoading: boolean;
   onManualLyricUpload: (text: string) => void;
   onSeek?: (seconds: number) => void;
+  inline?: boolean;
 }
 
 export default function LyricSection({
@@ -33,6 +34,7 @@ export default function LyricSection({
   isLoading,
   onManualLyricUpload,
   onSeek,
+  inline = false,
 }: LyricSectionProps) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -94,7 +96,7 @@ export default function LyricSection({
   return (
     <div
       id="lyric-section"
-      className="absolute inset-0 z-40 bg-primary flex flex-col items-center overflow-hidden animate-in fade-in duration-200"
+      className={`${inline ? 'w-full h-full' : 'absolute inset-0 z-40 bg-primary'} flex flex-col items-center overflow-hidden animate-in fade-in duration-200`}
     >
       {/* Lyric Header bar */}
       <div className="w-full flex items-center justify-between border-b border-border px-4 py-3 bg-secondary shrink-0">
@@ -159,6 +161,9 @@ export default function LyricSection({
               const isPrev = idx === activeIdx - 1;
               const isNext = idx === activeIdx + 1;
 
+              const lineTime = line.time ?? 0;
+              const nextLineTime = lyricLines[idx + 1]?.time ?? lineTime + 5;
+
               let textClass = 'text-center transition-all duration-300 ';
               if (lyricMode === 'static') {
                 textClass += isActive
@@ -173,7 +178,6 @@ export default function LyricSection({
                   ? 'text-secondary text-base font-medium opacity-80'
                   : 'text-muted text-sm opacity-50';
               } else {
-                // Karaoke Focused view
                 textClass += isActive
                   ? 'text-accent text-2xl font-extrabold md:text-3xl scale-110 drop-shadow-md'
                   : isPrev
@@ -182,6 +186,12 @@ export default function LyricSection({
                   ? 'text-secondary text-lg font-semibold'
                   : 'text-muted text-xs opacity-30';
               }
+
+              // Karaoke word-by-word highlight
+              const words = line.text.split(' ');
+              const karaokeProgress = isActive && lyricMode === 'karaoke'
+                ? Math.min(1, Math.max(0, (currentTime - lineTime) / Math.max(0.1, nextLineTime - lineTime)))
+                : -1;
 
               return (
                 <p
@@ -195,7 +205,21 @@ export default function LyricSection({
                   className={`${textClass} leading-relaxed py-1 block origin-center cursor-pointer hover:text-accent font-semibold transition-all duration-200 active:scale-95`}
                   title="Nhấp để nhảy nhạc đến đoạn này"
                 >
-                  {line.text}
+                  {karaokeProgress >= 0 ? (
+                    words.map((word, wi) => {
+                      const wordProgress = (wi + 1) / words.length;
+                      return (
+                        <span
+                          key={wi}
+                          className={`transition-all duration-150 ${wordProgress <= karaokeProgress ? 'text-accent drop-shadow-[0_0_6px_var(--accent)] scale-105' : 'text-foreground/30'}`}
+                        >
+                          {word}{wi < words.length - 1 ? ' ' : ''}
+                        </span>
+                      );
+                    })
+                  ) : (
+                    line.text
+                  )}
                 </p>
               );
             })}
