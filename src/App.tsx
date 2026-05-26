@@ -67,9 +67,10 @@ export default function App() {
 
   // Lyric States
   const [showLyrics, setShowLyrics] = useState(false);
-  const [showLyricMenu, setShowLyricMenu] = useState(false);
-  const lyricMenuRef = useRef<HTMLDivElement>(null);
+  const [showLyricHub, setShowLyricHub] = useState(false);
+  const lyricHubRef = useRef<HTMLDivElement>(null);
   const lyricFileRef = useRef<HTMLInputElement>(null);
+  const [pasteTrigger, setPasteTrigger] = useState(0);
   const [lyricMode, setLyricMode] = useState<LyricMode>('scroll');
   const [lyricLines, setLyricLines] = useState<LyricLine[]>([]);
   const [lyricSource, setLyricSource] = useState<'lrclib' | 'ai' | 'manual' | null>(null);
@@ -1397,6 +1398,7 @@ export default function App() {
                 onManualLyricUpload={handleManualLyricUpload}
                 onSeek={seekTime}
                 inline
+                openPasteForm={pasteTrigger}
               />
             </div>
           ) : (
@@ -1609,41 +1611,85 @@ export default function App() {
           </div>
         </div>
 
-        {/* Center: Lyrics menu with dropdown */}
-        <div className="relative shrink-0" ref={lyricMenuRef}>
+        {/* Center: Lyric hub button + bento popup */}
+        <div className="relative shrink-0" ref={lyricHubRef}>
           <button
-            onClick={() => setShowLyricMenu(prev => !prev)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10.5px] font-bold border border-border/70 hover:border-accent/30 hover:text-accent transition-all cursor-pointer bg-accent/5"
+            onClick={() => setShowLyricHub(prev => !prev)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10.5px] font-bold border transition-all cursor-pointer ${
+              showLyricHub
+                ? 'bg-accent/20 border-accent text-accent'
+                : 'bg-accent/5 border-border/70 hover:border-accent/30 hover:text-accent'
+            }`}
           >
             <span>🎤</span>
             <span>Lời</span>
-            <span className="text-[7px] opacity-60">{showLyricMenu ? '▲' : '▼'}</span>
           </button>
 
-          {showLyricMenu && (
+          {showLyricHub && (
             <>
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-secondary/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl p-1.5 min-w-[180px] z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
-                <button
-                  onClick={() => { setShowLyricMenu(false); setShowLyrics(true); }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-semibold text-left hover:bg-accent/10 hover:text-accent transition-all cursor-pointer"
-                >
-                  <span>📖</span> Xem lời
-                </button>
-                <button
-                  onClick={() => { setShowLyricMenu(false); if (activeTrack) fetchLyricsForTrack(activeTrack, currentTrackIndex); }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-semibold text-left hover:bg-accent/10 hover:text-accent transition-all cursor-pointer"
-                  disabled={!activeTrack || lyricLoading}
-                >
-                  <span>🔍</span> Tự tìm
-                </button>
-                <button
-                  onClick={() => { setShowLyricMenu(false); lyricFileRef.current?.click(); }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-semibold text-left hover:bg-accent/10 hover:text-accent transition-all cursor-pointer"
-                >
-                  <span>📂</span> Tải file
-                </button>
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-secondary/95 backdrop-blur-3xl border border-border/90 p-3 rounded-2xl shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200 text-left z-50">
+                <div className="flex items-center justify-between border-b border-border/60 pb-2 mb-2">
+                  <span className="text-[10px] font-black uppercase text-primary tracking-wider flex items-center gap-1.5">
+                    <span>🎤</span> Trung tâm Lời
+                  </span>
+                  {lyricSource && (
+                    <span className="text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+                      style={{
+                        backgroundColor: lyricSource === 'ai' ? '#10b98120' : lyricSource === 'lrclib' ? '#6366f120' : '#f59e0b20',
+                        color: lyricSource === 'ai' ? '#10b981' : lyricSource === 'lrclib' ? '#818cf8' : '#f59e0b',
+                      }}
+                    >
+                      {lyricSource === 'lrclib' ? '📡 LRCLIB' : lyricSource === 'ai' ? '✨ AI' : '📝 Manual'}
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-0.5">
+                  <button
+                    onClick={() => { setShowLyricHub(false); setShowLyrics(prev => !prev); }}
+                    className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[10.5px] font-semibold text-left transition-all cursor-pointer ${
+                      showLyrics ? 'bg-accent/15 text-accent' : 'hover:bg-accent/10 hover:text-accent'
+                    }`}
+                  >
+                    <span className="text-sm">{showLyrics ? '👁️' : '📖'}</span>
+                    {showLyrics ? 'Ẩn lời' : 'Xem lời'}
+                  </button>
+
+                  <button
+                    onClick={() => { setShowLyricHub(false); setShowLyrics(true); setPasteTrigger(p => p + 1); }}
+                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[10.5px] font-semibold text-left hover:bg-accent/10 hover:text-accent transition-all cursor-pointer"
+                  >
+                    <span className="text-sm">✍️</span> Nhập lời
+                  </button>
+
+                  <button
+                    onClick={() => { setShowLyricHub(false); lyricFileRef.current?.click(); }}
+                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[10.5px] font-semibold text-left hover:bg-accent/10 hover:text-accent transition-all cursor-pointer"
+                  >
+                    <span className="text-sm">📂</span> Tải file (.lrc, .txt)
+                  </button>
+
+                  <div className="border-t border-border/60 my-1" />
+
+                  <div className="grid grid-cols-2 gap-1">
+                    <button
+                      onClick={() => { setShowLyricHub(false); if (activeTrack) fetchLyricsForTrack(activeTrack, currentTrackIndex); }}
+                      disabled={!activeTrack || lyricLoading}
+                      className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <span>🤖</span> AI tìm
+                    </button>
+                    <button
+                      onClick={() => { setShowLyricHub(false); setLyricMode(prev => prev === 'scroll' ? 'karaoke' : 'scroll'); }}
+                      className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 transition-all cursor-pointer"
+                    >
+                      <span>{lyricMode === 'scroll' ? '🎤' : '📜'}</span>
+                      {lyricMode === 'scroll' ? 'Karaoke' : 'Cuộn'}
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div className="fixed inset-0 z-40" onClick={() => setShowLyricMenu(false)} />
+              <div className="fixed inset-0 z-40" onClick={() => setShowLyricHub(false)} />
             </>
           )}
         </div>

@@ -20,6 +20,7 @@ interface LyricSectionProps {
   onManualLyricUpload: (text: string) => void;
   onSeek?: (seconds: number) => void;
   inline?: boolean;
+  openPasteForm?: number;
 }
 
 export default function LyricSection({
@@ -35,12 +36,21 @@ export default function LyricSection({
   onManualLyricUpload,
   onSeek,
   inline = false,
+  openPasteForm,
 }: LyricSectionProps) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeIdx, setActiveIdx] = useState<number>(-1);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [pastedLyric, setPastedLyric] = useState('');
+
+  // External trigger to open paste form (from hub)
+  useEffect(() => {
+    if (openPasteForm && openPasteForm > 0) {
+      setPastedLyric(lyricLines.length > 0 ? lyricLines.map(l => l.text).join('\n') : '');
+      setIsFormOpen(true);
+    }
+  }, [openPasteForm]);
 
   // Synchronize dynamic highlighted lines
   useEffect(() => {
@@ -260,51 +270,18 @@ export default function LyricSection({
             </div>
           </div>
         ) : (
-          /* Empty Lyric state */
+          /* Empty Lyric state — text only, no action buttons (all in hub) */
           <div className="h-full flex flex-col items-center justify-center p-8 text-center text-muted max-w-sm mx-auto">
             <div className="w-12 h-12 rounded-full bg-tertiary flex items-center justify-center mb-4 border border-border">
               <Upload className="w-6 h-6 text-secondary" />
             </div>
             <p className="text-sm font-semibold text-primary mb-1">Không tìm thấy lời bài hát tự động</p>
             <p className="text-xs text-muted">
-              Hệ thống không tìm thấy lyrics. Dùng nút phía dưới để tải file .LRC/.TXT hoặc dán văn bản lời bài hát.
+              Hệ thống không tìm thấy lyrics. Dùng nút 🎤 Trung tâm Lời ở thanh dưới để tải file .LRC/.TXT hoặc dán văn bản lời bài hát.
             </p>
           </div>
         )}
       </div>
-
-      {/* Sticky footer with actions */}
-      <div className="border-t border-border px-3 py-2 bg-secondary/80 shrink-0 flex items-center justify-between gap-2">
-        <span className="text-[9px] text-muted font-medium truncate max-w-[120px]">
-          {lyricSource === 'lrclib'
-            ? '📡 LRCLIB'
-            : lyricSource === 'ai'
-            ? '✨ Gemini AI'
-            : lyricLines.length > 0 ? '📝 Đã nhập' : ''}
-        </span>
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="text-[10px] font-bold px-2.5 py-1 rounded-lg border border-border hover:border-accent/30 text-secondary hover:text-accent transition-all cursor-pointer flex items-center gap-1"
-            title="Tải file .lrc / .txt"
-          >
-            <Upload className="w-3 h-3" /> File
-          </button>
-          <button
-            onClick={() => {
-              setPastedLyric(lyricLines.length > 0 ? lyricLines.map(l => l.text).join('\n') : '');
-              setIsFormOpen(true);
-            }}
-            className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-accent text-white hover:bg-accent-dim transition-all cursor-pointer flex items-center gap-1"
-            title="Dán lời bài hát"
-          >
-            ✍️ Dán
-          </button>
-        </div>
-      </div>
-
-      {/* Hidden file input */}
-      <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".lrc,.txt" className="hidden" />
 
       {/* Floating paste lyric modal backdrop */}
       {isFormOpen && lyricLines.length > 0 && (
