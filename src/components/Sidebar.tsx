@@ -154,12 +154,8 @@ export default function Sidebar({
     };
 
   const handleConnectR2Manual = () => {
-    if (!r2Url.trim()) {
-      setR2Status({ type: 'err', msg: 'Vui lòng cung cấp Public Bucket URL' });
-      return;
-    }
     if (!r2FilesText.trim()) {
-      setR2Status({ type: 'err', msg: 'Vui lòng điền danh sách tên tệp nhạc để nạp' });
+      setR2Status({ type: 'err', msg: 'Vui lòng điền tên tệp hoặc URL file nhạc' });
       return;
     }
 
@@ -169,12 +165,35 @@ export default function Sidebar({
       .filter((l) => l.length > 0 && /\.(mp3|flac|aac|ogg|wav|m4a)$/i.test(l));
 
     if (lines.length === 0) {
-      setR2Status({ type: 'err', msg: 'Không tìm thấy tên tệp nhạc hợp lệ nào trong danh sách (Đi kèm đuôi .mp3, .flac, .m4a...)' });
+      setR2Status({ type: 'err', msg: 'Không tìm thấy file nhạc hợp lệ nào (cần đuôi .mp3, .flac, .m4a...)' });
       return;
     }
 
-    onR2BulkAdd(r2Url.trim(), lines);
-    setR2Status({ type: 'ok', msg: `✅ Đã thêm ${lines.length} bài hát từ R2 thủ công!` });
+    // Phân loại: URL đầy đủ vs tên file
+    const urls = lines.filter(l => l.startsWith('http'));
+    const filenames = lines.filter(l => !l.startsWith('http'));
+
+    if (urls.length > 0) {
+      urls.forEach(url => {
+        const name = url.split('/').pop()?.replace(/\?.*/, '').replace(/\.[^.]+$/, '') || 'R2 Track';
+        onCloudTrackAdd({
+          source: 'URL',
+          title: name,
+          artist: 'R2 File',
+          url,
+        });
+      });
+    }
+    if (filenames.length > 0) {
+      if (!r2Url.trim()) {
+        setR2Status({ type: 'err', msg: 'Cần nhập R2 Public Bucket URL để dùng tên file' });
+        return;
+      }
+      onR2BulkAdd(r2Url.trim(), filenames);
+    }
+
+    const total = urls.length + filenames.length;
+    setR2Status({ type: 'ok', msg: `✅ Đã thêm ${total} bài hát từ R2!` });
     setR2FilesText('');
   };
 
@@ -292,9 +311,9 @@ export default function Sidebar({
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-extrabold text-primary tracking-tight uppercase flex items-center gap-1.5 leading-none">
               DTMusic
-              <span className="text-[8px] bg-accent/20 text-accent px-1.5 py-0.5 rounded font-black uppercase tracking-wide">HQ</span>
+              <span className="text-[11px] bg-accent/20 text-accent px-1.5 py-0.5 rounded font-black uppercase tracking-wide">HQ</span>
             </span>
-            <span className="text-[8px] text-muted font-bold tracking-widest uppercase mt-0.5">Audiophile Player</span>
+            <span className="text-[11px] text-muted font-bold tracking-widest uppercase mt-0.5">Audiophile Player</span>
           </div>
         </div>
 
@@ -314,11 +333,11 @@ export default function Sidebar({
         onClick={() => setIsSourceExpanded(!isSourceExpanded)}
         className="flex items-center justify-between px-4 py-2 bg-tertiary/20 hover:bg-tertiary/30 border-b border-border/40 cursor-pointer transition-all duration-200 select-none group"
       >
-        <span className="text-[10px] font-extrabold text-secondary group-hover:text-primary uppercase tracking-wider flex items-center gap-1.5 align-middle">
+        <span className="text-[11px] font-extrabold text-secondary group-hover:text-primary uppercase tracking-wider flex items-center gap-1.5 align-middle">
           <HardDrive className="w-3.5 h-3.5 text-accent animate-pulse" />
           Bộ nguồn kết nối nhạc
         </span>
-        <span className="text-secondary group-hover:text-primary text-[10px] font-bold flex items-center gap-1">
+        <span className="text-secondary group-hover:text-primary text-[11px] font-bold flex items-center gap-1">
           {isSourceExpanded ? '▲ Thu gọn' : '▼ Cấu hình'}
         </span>
       </div>
@@ -330,7 +349,7 @@ export default function Sidebar({
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all duration-250 cursor-pointer text-center relative border ${
+              className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-250 cursor-pointer text-center relative border ${
                 activeTab === tab
                   ? 'bg-accent/15 border-accent text-accent font-extrabold shadow-sm'
                   : 'bg-transparent border-transparent text-secondary hover:text-primary hover:bg-hover'
@@ -365,7 +384,7 @@ export default function Sidebar({
             >
               <FileMusic className="w-7 h-7 text-accent/80 mx-auto mb-1 animate-bounce" style={{ animationDuration: '3s' }} />
               <p className="text-[11px] font-bold text-primary mb-0.5">Thả nhạc hoặc nhấp để mở</p>
-              <span className="text-[9px] text-muted block font-medium">MP3, FLAC, WAV, AAC, M4A</span>
+              <span className="text-[11px] text-muted block font-medium">MP3, FLAC, WAV, AAC, M4A</span>
               <input
                 type="file"
                 ref={fileInputRef}
@@ -378,7 +397,7 @@ export default function Sidebar({
             
             <div className="flex gap-1.5 bg-accent/5 p-2 rounded-lg border border-accent/10">
               <span className="text-xs shrink-0">💡</span>
-              <p className="text-[9.5px] text-secondary leading-normal font-semibold">
+              <p className="text-[10.5px] text-secondary leading-normal font-semibold">
                 Nhạc cục bộ lưu trữ trên trình duyệt của bạn, bảo mật tuyệt đối 100%.
               </p>
             </div>
@@ -389,17 +408,17 @@ export default function Sidebar({
         {activeTab === 'r2' && (
           <div className="space-y-2">
             <div className="flex items-center gap-1">
-              <span className="text-[9px] inline-flex items-center gap-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-black uppercase tracking-wider">
+              <span className="text-[11px] inline-flex items-center gap-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-black uppercase tracking-wider">
                 ⭐ Cloud Storage
               </span>
-              <span className="text-[8px] text-muted">R2 Public Bucket</span>
+              <span className="text-[11px] text-muted">R2 Public Bucket</span>
             </div>
 
             {/* ─── R2 PUBLIC BUCKET ─── */}
               <div className="space-y-2">
 
                 <div className="space-y-1">
-                  <label className="block text-[9.5px] font-extrabold uppercase tracking-wider text-secondary/90">
+                  <label className="block text-[10.5px] font-extrabold uppercase tracking-wider text-secondary/90">
                     R2 Public Bucket URL
                   </label>
                   <input
@@ -409,7 +428,7 @@ export default function Sidebar({
                     placeholder="https://pub-xxx.r2.dev"
                     className="w-full bg-primary/40 border border-border/70 hover:border-accent/40 focus:border-accent focus:ring-1 focus:ring-accent rounded-lg px-3 py-1.5 text-xs text-primary placeholder-muted/65 outline-none transition-all duration-200"
                   />
-                  <p className="text-[9px] text-muted leading-normal">
+                  <p className="text-[11px] text-muted leading-normal">
                     Nhạc từ R2 được proxy qua máy chủ (same-origin) để tương thích với <b>bộ EQ Web Audio</b>.
                     Yêu cầu bucket bật <b>"Public Access"</b> + <b>CORS Policy</b> như hướng dẫn bên dưới.
                   </p>
@@ -426,14 +445,14 @@ export default function Sidebar({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block text-[9.5px] font-extrabold uppercase tracking-wider text-secondary/90">
-                    Hoặc dán tên tệp nhạc thủ công
+                  <label className="block text-[10.5px] font-extrabold uppercase tracking-wider text-secondary/90">
+                    Hoặc dán tên tệp hoặc URL trực tiếp
                   </label>
                   <textarea
                     rows={3}
                     value={r2FilesText}
                     onChange={(e) => setR2FilesText(e.target.value)}
-                    placeholder="song_01.mp3&#10;rap_lofi.flac&#10;chill_beat.m4a"
+                    placeholder="song_01.mp3&#10;https://pub-xxx.r2.dev/beat.flac&#10;chill_beat.m4a"
                     className="w-full bg-primary/40 border border-border/70 hover:border-accent/40 focus:border-accent focus:ring-1 focus:ring-accent rounded-lg p-2 text-xs text-primary placeholder-muted/65 outline-none transition-all duration-200 font-mono resize-none leading-relaxed"
                   />
                   <button
@@ -457,7 +476,7 @@ export default function Sidebar({
                       Vào tab <b>Settings</b> của Bucket trên Cloudflare &gt; <b>CORS Policy</b> &gt; bấm Edit và dán:
                     </p>
                     <div className="relative">
-                      <pre className="text-[7.5px] font-mono text-primary bg-secondary/80 rounded p-2 overflow-x-auto leading-relaxed border border-border/40">
+                      <pre className="text-[10.5px] font-mono text-primary bg-secondary/80 rounded p-2 overflow-x-auto leading-relaxed border border-border/40">
 {`[
   {
     "AllowedOrigins": ["*"],
@@ -476,7 +495,7 @@ export default function Sidebar({
                           const corsText = `[\n  {\n    "AllowedOrigins": ["*"],\n    "AllowedMethods": ["GET", "HEAD"],\n    "AllowedHeaders": ["*"],\n    "ExposeHeaders": ["Content-Range", "Content-Length", "Accept-Ranges"]\n  }\n]`;
                           navigator.clipboard.writeText(corsText);
                         }}
-                        className="absolute top-1 right-1 text-[8px] px-1.5 py-0.5 rounded bg-accent/20 text-accent hover:bg-accent/30 transition-all cursor-pointer font-bold"
+                        className="absolute top-1 right-1 text-[11px] px-1.5 py-0.5 rounded bg-accent/20 text-accent hover:bg-accent/30 transition-all cursor-pointer font-bold"
                       >
                         📋 Copy
                       </button>
@@ -486,7 +505,7 @@ export default function Sidebar({
 
                 {r2Status.type !== 'idle' && (
                   <div
-                    className={`text-[9.5px] font-semibold p-2 rounded-lg border leading-snug ${
+                    className={`text-[10.5px] font-semibold p-2 rounded-lg border leading-snug ${
                       r2Status.type === 'ok' 
                         ? 'bg-emerald-500/5 text-emerald-400 border-emerald-500/15' 
                         : 'bg-rose-500/5 text-rose-400 border-rose-500/15'
@@ -504,8 +523,8 @@ export default function Sidebar({
           <div className="space-y-2">
             <div className="bg-accent/5 border border-accent/10 rounded-lg p-2 space-y-1.5">
               <div className="flex items-center gap-1">
-                <span className="text-[9px] font-bold text-accent uppercase tracking-wider">Google Drive</span>
-                <span className="text-[8px] text-muted">Dán link → phát nhạc</span>
+                <span className="text-[11px] font-bold text-accent uppercase tracking-wider">Google Drive</span>
+                <span className="text-[11px] text-muted">Dán link → phát nhạc</span>
               </div>
               <input
                 type="url"
@@ -534,7 +553,7 @@ export default function Sidebar({
         {activeTab === 'dropbox' && (
           <div className="space-y-2">
             <div className="space-y-1">
-              <label className="block text-[9.5px] font-extrabold uppercase tracking-wider text-secondary/90">
+              <label className="block text-[10.5px] font-extrabold uppercase tracking-wider text-secondary/90">
                 Dropbox Stream Link
               </label>
               <input
@@ -544,7 +563,7 @@ export default function Sidebar({
                 placeholder="https://www.dropbox.com/s/..."
                 className="w-full bg-primary/40 border border-border/70 hover:border-accent/40 focus:border-accent focus:ring-1 focus:ring-accent rounded-lg px-3 py-1.5 text-xs text-primary placeholder-muted/65 outline-none transition-all duration-200"
               />
-                <p className="text-[9px] text-muted leading-normal">
+                <p className="text-[11px] text-muted leading-normal">
                   <b>NOTE</b>: Đảm bảo rằng liên kết Dropbox của bạn là liên kết chia sẻ công khai. Ứng dụng sẽ tự động chuyển đổi nó thành liên kết truyền phát trực tiếp.
                 </p>
             </div>
@@ -563,14 +582,14 @@ export default function Sidebar({
           <div className="space-y-3 divide-y divide-border/40">
             {/* OneDrive Container */}
             <div className="space-y-1.5 pb-2">
-              <h4 className="text-[10px] font-extrabold text-accent uppercase tracking-wider flex items-center gap-1">
+              <h4 className="text-[11px] font-extrabold text-accent uppercase tracking-wider flex items-center gap-1">
                 <span>Ⓜ️</span> Microsoft OneDrive
               </h4>
               
               <div className="space-y-1">
-                <label className="block text-[9px] font-bold uppercase tracking-wider text-secondary/70">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-secondary/70">
                   OneDrive Download URL
-                  <p className="text-[9px] text-muted leading-normal">
+                  <p className="text-[11px] text-muted leading-normal">
                     <b>NOTE</b>: Bạn cần cung cấp URL tải xuống trực tiếp từ OneDrive. Để lấy URL này, hãy chia sẻ tệp, sau đó nhấp vào "Tải xuống" và sao chép địa chỉ liên kết.
                   </p>
                 </label>
@@ -584,7 +603,7 @@ export default function Sidebar({
               </div>
 
               <div className="space-y-1">
-                <label className="block text-[9px] font-bold uppercase tracking-wider text-secondary/70">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-secondary/70">
                   Tên hiển thị (Tùy chọn)
                 </label>
                 <input
@@ -606,14 +625,14 @@ export default function Sidebar({
 
             {/* Direct URL Container */}
             <div className="space-y-1.5 pt-2">
-              <h4 className="text-[10px] font-extrabold text-accent uppercase tracking-wider flex items-center gap-1">
+              <h4 className="text-[11px] font-extrabold text-accent uppercase tracking-wider flex items-center gap-1">
                 <span>🔗</span> Liên kết trực tiếp (URL)
               </h4>
 
               <div className="space-y-1">
-                <label className="block text-[9px] font-bold uppercase tracking-wider text-secondary/70">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-secondary/70">
                   Đường dẫn tệp (MP3, FLAC, WAV)
-                  <p className="text-[9px] text-muted leading-normal">
+                  <p className="text-[11px] text-muted leading-normal">
                     Dán URL trực tiếp tệp âm thanh (.mp3, .flac...). URL sẽ được proxy qua Vercel hoặc Cloudflare Worker để tránh CORS.
                   </p>
                 </label>
@@ -627,7 +646,7 @@ export default function Sidebar({
               </div>
 
               <div className="space-y-1">
-                <label className="block text-[9px] font-bold uppercase tracking-wider text-secondary/70">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-secondary/70">
                   Tên hiển thị (Tùy chọn)
                 </label>
                 <input
@@ -657,7 +676,7 @@ export default function Sidebar({
           {tracks.length > 0 && (
             <button
               onClick={onClearAll}
-              className="text-[9px] px-2 py-1 rounded border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-all cursor-pointer font-bold shrink-0 flex items-center gap-1"
+              className="text-[11px] px-2 py-1 rounded border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-all cursor-pointer font-bold shrink-0 flex items-center gap-1"
               title="Xóa tất cả"
             >
               <Trash2 className="w-3 h-3" /> Clear
@@ -678,7 +697,7 @@ export default function Sidebar({
             <select
               value={filterSource}
               onChange={(e) => setFilterSource(e.target.value)}
-              className="text-[10px] pl-[22px] pr-2 py-1.5 rounded-lg border border-border bg-secondary text-secondary cursor-pointer focus:outline-none font-medium appearance-none"
+              className="text-[11px] pl-[22px] pr-2 py-1.5 rounded-lg border border-border bg-secondary text-secondary cursor-pointer focus:outline-none font-medium appearance-none"
             >
               <option value="all">Nguồn</option>
               <option value="local">Local</option>
@@ -741,10 +760,10 @@ export default function Sidebar({
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] text-muted truncate max-w-[100px]">
+                        <span className="text-[11px] text-muted truncate max-w-[100px]">
                           {track.artist || (track.source === 'local' ? 'File đã tải' : 'Online Stream')}
                         </span>
-                        <span className="text-[8px] px-1.5 py-[1px] border border-border rounded bg-secondary text-muted uppercase font-bold shrink-0">
+                        <span className="text-[11px] px-1.5 py-[1px] border border-border rounded bg-secondary text-muted uppercase font-bold shrink-0">
                           {track.source}
                         </span>
                         {track.missing && (
@@ -806,7 +825,7 @@ export default function Sidebar({
             </h3>
             
             <div className="space-y-1">
-              <label className="block text-[9.5px] text-secondary font-bold uppercase tracking-wider">Tên bài hát</label>
+              <label className="block text-[10.5px] text-secondary font-bold uppercase tracking-wider">Tên bài hát</label>
               <input
                 type="text"
                 value={editingTrack.title}
@@ -817,7 +836,7 @@ export default function Sidebar({
             </div>
 
             <div className="space-y-1">
-              <label className="block text-[9.5px] text-secondary font-bold uppercase tracking-wider">Nghệ sĩ / Ca sĩ</label>
+              <label className="block text-[10.5px] text-secondary font-bold uppercase tracking-wider">Nghệ sĩ / Ca sĩ</label>
               <input
                 type="text"
                 value={editingTrack.artist}

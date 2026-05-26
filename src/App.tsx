@@ -1430,12 +1430,12 @@ export default function App() {
               <div className="flex items-center justify-center gap-2 mt-2">
                 <button
                   onClick={() => setShowEQ((prev) => !prev)}
-                  className={`text-[8.5px] md:text-[9px] font-bold px-2.5 py-0.5 rounded-full transition-all cursor-pointer flex items-center gap-1 border border-border ${
+                  className={`text-[10.5px] md:text-[11px] font-bold px-3 py-1 rounded-full transition-all cursor-pointer flex items-center gap-1.5 border border-border ${
                     showEQ ? 'bg-accent/20 border-accent text-accent font-extrabold shadow-sm' : 'text-secondary hover:text-primary hover:bg-hover'
                   }`}
                 >
                   <span>🎛️</span>
-                  <span>EQ {showEQ ? 'Bật' : 'Tắt'}</span>
+                  <span>EQ</span>
                 </button>
                 <button
                   onClick={() => setShowLyrics(true)}
