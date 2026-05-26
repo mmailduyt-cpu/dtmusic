@@ -132,6 +132,26 @@ export default function App() {
   const [driveClientId, setDriveClientId] = useState(() => localStorage.getItem('dt_drive_client_id') || '');
   const [driveClientSecret, setDriveClientSecret] = useState(() => localStorage.getItem('dt_drive_client_secret') || '');
 
+  // Worker proxy do chủ web deploy, set qua env VITE_WORKER_URL khi build
+  // (ví dụ VITE_WORKER_URL=https://proxy.domain.workers.dev)
+  // Nếu không set, mọi proxy sẽ fallback qua /api/proxy (Vercel)
+  const WORKER_BASE = (import.meta as any).env?.VITE_WORKER_URL || '';
+
+  // Helper: proxy cho các nguồn cần CORS (Drive, Dropbox, URL...)
+  const getProxyUrl = (targetUrl: string, accessToken?: string): string => {
+    const params = new URLSearchParams({ url: targetUrl });
+    if (accessToken) params.set('access_token', accessToken);
+    if (WORKER_BASE) {
+      return `${WORKER_BASE.replace(/\/$/, '')}/?${params.toString()}`;
+    }
+    return `/api/proxy?${params.toString()}`;
+  };
+
+  // Helper: phát trực tiếp từ R2 public (không proxy) nếu bucket public + CORS
+  const getDirectUrl = (targetUrl: string): string => {
+    return targetUrl;
+  };
+
   // Handle Google OAuth redirect callback on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -299,7 +319,7 @@ export default function App() {
 
   const getDriveStreamUrl = async (webContentLink: string): Promise<string | null> => {
     if (!driveToken?.accessToken) return null;
-    return `/api/proxy?url=${encodeURIComponent(webContentLink)}&access_token=${driveToken.accessToken}`;
+    return getProxyUrl(webContentLink, driveToken.accessToken);
   };
 
   const handleDriveBulkAdd = (files: { id: string; title: string; webContentLink: string }[]) => {
@@ -720,22 +740,24 @@ export default function App() {
         setIsPlaying(false);
         return;
       }
-    } else if (track.source === 'Drive' && track.originalCloudUrl) {
-      try {
-        let url = await getDriveStreamUrl(track.originalCloudUrl);
+    } else if (track.source === 'Drive') {
+      // Drive phát qua proxy đã wrap sẵn trong track.url (từ handleCloudTrackAdd)
+      // Nếu có OAuth token, ưu tiên dùng proxy có access_token
+      let url: string | null = null;
+      if (track.originalCloudUrl) {
+        url = await getDriveStreamUrl(track.originalCloudUrl);
         if (!url && driveToken?.refreshToken) {
           const refreshed = await refreshDriveToken();
           if (refreshed) url = await getDriveStreamUrl(track.originalCloudUrl);
         }
-        if (url) {
-          audio.src = url;
-        } else {
-          showToast('⚠️ Google Drive chưa được kết nối. Vui lòng kết nối lại.');
-          setIsPlaying(false);
-          return;
-        }
-      } catch (err: any) {
-        showToast(`❌ Lỗi phát Drive: ${err.message}`);
+      }
+      if (url) {
+        audio.src = url;
+      } else if (track.url) {
+        // Fallback: dùng URL đã proxy sẵn (cho single URL mode không OAuth)
+        audio.src = track.url;
+      } else {
+        showToast('⚠️ Google Drive chưa được kết nối. Vui lòng kết nối lại.');
         setIsPlaying(false);
         return;
       }
@@ -1084,8 +1106,7 @@ export default function App() {
 
   const handleCloudTrackAdd = (newTrack: Omit<Track, 'id'>) => {
     const generatedId = `cloud_${Date.now()}`;
-
-    const proxiedUrl = `/api/proxy?url=${encodeURIComponent(newTrack.url || '')}`;
+    const proxiedUrl = getProxyUrl(newTrack.url || '');
 
     const trackWithId: Track = { 
       ...newTrack, 
@@ -1100,12 +1121,13 @@ export default function App() {
 
   const handleR2BulkAdd = (url: string, files: string[]) => {
     const items: Track[] = files.map((fileName) => {
-      // Construct proxy URL for R2 tracks
+      // R2 public bucket: dùng URL trực tiếp (không proxy) để tránh Vercel timeout
+      // Yêu cầu bucket bật Public Access + CORS policy
       const cleanBase = url.replace(/\/$/, '');
       const cleanPath = fileName.split('/')
         .map(segment => encodeURIComponent(segment))
         .join('/');
-      const proxiedUrl = `/api/proxy?url=${encodeURIComponent(`${cleanBase}/${cleanPath}`)}`;
+      const directUrl = getDirectUrl(`${cleanBase}/${cleanPath}`);
 
       const title = `R2 - ${fileName.replace(/\.[^.]+$/, '')}`;
       
@@ -1114,7 +1136,7 @@ export default function App() {
         source: 'R2',
         title,
         artist: 'Cloudflare R2 Bucket',
-        url: proxiedUrl, // This will now be the proxied URL
+        url: directUrl,
         r2BucketUrl: cleanBase, // Store original R2 bucket URL
         r2FileName: fileName, // Store original R2 file name
       };

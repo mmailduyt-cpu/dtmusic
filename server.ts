@@ -325,8 +325,7 @@ app.post("/api/s3/sign", async (req, res) => {
 // token refresh, file listing, content streaming).
 // --------------------------------------------------------------------------------
 
-// Example Placeholder for Google Drive Integration:
-/*
+// ─── Google Drive OAuth & API Routes ───
 // Google Drive OAuth Token Exchange
 app.post("/api/drive/token", async (req, res) => {
   try {
@@ -447,7 +446,6 @@ app.get("/api/drive/stream/:fileId", async (req, res) => {
     const meta = await metaResponse.json();
     if (!metaResponse.ok) throw new Error(meta.error?.message || "Failed to get file info");
 
-    // Redirect to the webContentLink with token
     const streamUrl = `${meta.webContentLink}&access_token=${accessToken}`;
     const fileResponse = await fetch(streamUrl, {
       headers: {
@@ -478,7 +476,6 @@ app.get("/api/drive/stream/:fileId", async (req, res) => {
     if (!res.headersSent) res.status(500).send("Stream error: " + err.message);
   }
 });
-*/
 
 // Example Placeholder for Amazon S3 Integration:
 /*

@@ -806,7 +806,8 @@ export default function Sidebar({
                     className="w-full bg-primary/40 border border-border/70 hover:border-accent/40 focus:border-accent focus:ring-1 focus:ring-accent rounded-lg px-3 py-1.5 text-xs text-primary placeholder-muted/65 outline-none transition-all duration-200"
                   />
                   <p className="text-[9px] text-muted leading-normal">
-                    Bạn cần bật <b>"Public Access"</b> cho bucket. Liên kết có dạng <b>https://pub-xxx.r2.dev/</b>
+                    Nhạc từ R2 public bucket được phát <b>trực tiếp</b> (không qua proxy), tránh giới hạn Vercel.
+                    Yêu cầu bucket bật <b>"Public Access"</b> + <b>CORS Policy</b> như hướng dẫn bên dưới.
                   </p>
                 </div>
 
@@ -1137,7 +1138,7 @@ export default function Sidebar({
                 <label className="block text-[9px] font-bold uppercase tracking-wider text-secondary/70">
                   Đường dẫn tệp (MP3, FLAC, WAV)
                   <p className="text-[9px] text-muted leading-normal">
-                    <b>NOTE</b>: Dán trực tiếp URL của tệp âm thanh (ví dụ: .mp3, .flac). Đảm bảo URL này có thể truy cập công khai và hỗ trợ phát trực tuyến.
+                    Dán URL trực tiếp tệp âm thanh (.mp3, .flac...). URL sẽ được proxy qua Vercel hoặc Cloudflare Worker để tránh CORS.
                   </p>
                 </label>
                 <input
